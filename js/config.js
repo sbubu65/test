@@ -3,7 +3,7 @@
 window.AssetAudit = {
   config: {
     appName: "Asset Audit",
-    version: "V0.3",
+    version: "V0.4",
     defaultRoute: "dashboard",
 
     // Daftar halaman.
@@ -16,7 +16,8 @@ window.AssetAudit = {
       { id: "riwayat",      label: "Riwayat Audit",  icon: "history" },
 
       { id: "audit-laptop", label: "Audit Laptop",   hidden: true, navParent: "mulai-audit" },
-      { id: "audit-selesai", label: "Audit Selesai", hidden: true, navParent: "mulai-audit" }
+      { id: "audit-selesai", label: "Audit Selesai", hidden: true, navParent: "mulai-audit" },
+      { id: "hasil-audit",   label: "Detail Hasil Audit", hidden: true, navParent: "riwayat" }
     ],
 
     // Jenis perangkat. "auditRoute" diisi jika audit untuk perangkat itu sudah tersedia.

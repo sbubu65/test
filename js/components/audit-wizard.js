@@ -1,11 +1,12 @@
 /* Wizard audit yang bisa dipakai semua jenis perangkat.
    Pemakaian: AssetAudit.components.auditWizard(container, AssetAudit.auditDefs.laptop)
 
-   Alur: tiap "step" di definisi -> satu layar isian, lalu satu layar Review -> Simpan.
+   Alur: tiap "step" di definisi -> satu layar isian, lalu satu layar Review -> Submit.
    Data draft disimpan di AA.draft dengan bentuk:
      fields    -> data[section.id][field.id] = "teks"
      checklist -> data[section.id][item.id] = { status, note }
-     license   -> data[section.id][item.id] = { status, extra, note } */
+     license   -> data[section.id][item.id] = { status, extra, note }
+   Semua angka nilai berasal dari AssetAudit.scoring (satu rumus untuk seluruh aplikasi). */
 (function (AA) {
   var esc = AA.utils.escapeHtml;
   var STATUS_CLASS = { "OK": "ok", "Tidak OK": "bad", "N/A": "na" };
@@ -121,85 +122,163 @@
     return '<div class="review-row"><dt>' + esc(label) + "</dt><dd>" + valueHtml + "</dd></div>";
   }
 
-  function review(sec, data) {
-    var rows = "";
+  function reviewRows(sec, data) {
     if (sec.type === "fields") {
-      rows = sec.fields.map(function (f) {
+      return sec.fields.map(function (f) {
         var v = String(getVal(data, sec.id + "." + f.id)).trim();
         if (v && f.type === "date") v = AA.utils.formatDateID(v);
         return reviewRow(f.label, v ? esc(v) : "-");
       }).join("");
-    } else if (sec.type === "checklist") {
-      rows = sec.items.map(function (item) {
+    }
+
+    if (sec.type === "checklist") {
+      return sec.items.map(function (item) {
         var base = sec.id + "." + item.id;
         var status = getVal(data, base + ".status");
         var note = String(getVal(data, base + ".note")).trim();
         var noteHtml = status === NOTE_WHEN && note ? '<span class="review-note">' + esc(note) + "</span>" : "";
         return reviewRow(item.label, badge(status) + noteHtml);
       }).join("");
-    } else if (sec.type === "license") {
-      rows = sec.items.map(function (item) {
-        var base = sec.id + "." + item.id;
-        var extra = String(getVal(data, base + ".extra")).trim();
-        var note = String(getVal(data, base + ".note")).trim();
-        var detail = "";
-        if (extra) detail += '<span class="review-note">' + esc(item.extraLabel) + ": " + esc(extra) + "</span>";
-        if (note) detail += '<span class="review-note">Catatan: ' + esc(note) + "</span>";
-        return reviewRow(item.label, badge(getVal(data, base + ".status")) + detail);
-      }).join("");
     }
-    return '<section class="card"><h2>' + esc(sec.title) + '</h2><dl class="review-list">' + rows + "</dl></section>";
+
+    // license
+    return sec.items.map(function (item) {
+      var base = sec.id + "." + item.id;
+      var extra = String(getVal(data, base + ".extra")).trim();
+      var note = String(getVal(data, base + ".note")).trim();
+      var detail = "";
+      if (extra) detail += '<span class="review-note">' + esc(item.extraLabel) + ": " + esc(extra) + "</span>";
+      if (note) detail += '<span class="review-note">Catatan: ' + esc(note) + "</span>";
+      return reviewRow(item.label, badge(getVal(data, base + ".status")) + detail);
+    }).join("");
   }
 
-  /* ---------- Ringkasan Pemeriksaan (halaman Review) ---------- */
-  function summaryHtml(r) {
+  // Section dengan reviewGroup yang sama digabung dalam satu kartu (mis. Identitas + Spesifikasi laptop).
+  function reviewGroupsHtml(def, data) {
+    var groups = [];
+    var index = {};
+    def.steps.forEach(function (step) {
+      step.sections.forEach(function (sec) {
+        var title = sec.reviewGroup || sec.title;
+        if (!(title in index)) { index[title] = groups.length; groups.push({ title: title, html: "" }); }
+        groups[index[title]].html += reviewRows(sec, data);
+      });
+    });
+    return groups.map(function (g) {
+      return '<section class="card"><h2>' + esc(g.title) + '</h2><dl class="review-list">' + g.html + "</dl></section>";
+    }).join("");
+  }
+
+  function scoringPreviewHtml(r) {
     var rows =
-      reviewRow("Total item", esc(r.total)) +
+      reviewRow("Total Item", esc(r.total)) +
       reviewRow("OK", esc(r.ok)) +
       reviewRow("Tidak OK", esc(r.notOk)) +
       reviewRow("N/A", esc(r.na)) +
-      reviewRow("Item dihitung", esc(r.counted)) +
+      reviewRow("Item Dinilai", esc(r.counted)) +
       reviewRow("Nilai Audit", esc(r.scoreText)) +
       reviewRow("Kondisi", '<span class="badge badge--' + esc(r.tone) + '">' + esc(r.condition) + "</span>");
-    return '<section class="card"><h2>Ringkasan Pemeriksaan</h2><dl class="review-list">' + rows + "</dl></section>";
+    return (
+      '<h2 class="section-title">Scoring Preview</h2>' +
+      AA.components.scoreCard.render(r) +
+      '<section class="card"><dl class="review-list">' + rows + "</dl></section>"
+    );
   }
 
   function hasScoredSections(step) {
     return step.sections.some(function (sec) { return sec.scored; });
   }
 
-  /* ---------- validasi per langkah ---------- */
-  function validate(step, data) {
+  /* ---------- validasi ---------- */
+  function validateStep(step, stepIndex, data) {
     var missing = [];
     step.sections.forEach(function (sec) {
       if (sec.type === "fields") {
         sec.fields.forEach(function (f) {
           var path = sec.id + "." + f.id;
           if (f.required && !String(getVal(data, path)).trim()) {
-            missing.push({ kind: "field", path: path, label: f.label });
+            missing.push({ kind: "field", path: path, label: f.label, sectionTitle: sec.title, stepIndex: stepIndex });
           }
         });
       } else {
         sec.items.forEach(function (item) {
           var path = sec.id + "." + item.id;
-          if (!getVal(data, path + ".status")) missing.push({ kind: "item", path: path, label: item.label });
+          if (!getVal(data, path + ".status")) {
+            missing.push({ kind: "item", path: path, label: item.label, sectionTitle: sec.title, stepIndex: stepIndex });
+          }
         });
       }
     });
     return missing;
   }
 
-  function errorMessage(missing) {
-    var fields = missing.filter(function (m) { return m.kind === "field"; });
-    var items = missing.filter(function (m) { return m.kind === "item"; });
-    var parts = [];
-    if (fields.length) parts.push("Isi dulu: " + fields.map(function (m) { return m.label; }).join(", ") + ".");
-    if (items.length) parts.push("Pilih status untuk " + items.length + " item yang ditandai merah.");
-    return parts.join(" ");
+  // Semua langkah sekaligus: dipakai sebagai penjaga terakhir di Review/Submit.
+  function validateAll(def, data) {
+    var all = [];
+    def.steps.forEach(function (step, i) { all = all.concat(validateStep(step, i, data)); });
+    return all;
   }
 
+  function errorHtml(missing, withSection) {
+    var fields = missing.filter(function (m) { return m.kind === "field"; });
+    var items = missing.filter(function (m) { return m.kind === "item"; });
+    var html = "";
+    if (fields.length) {
+      html += "<p>Data wajib belum diisi: " + esc(fields.map(function (m) { return m.label; }).join(", ")) + ".</p>";
+    }
+    if (items.length) {
+      html += "<p>Masih ada item checklist yang belum diisi.</p>" +
+        '<ul class="notice__list">' + items.map(function (m) {
+          return "<li>" + esc(m.label) + (withSection ? " <span>(" + esc(m.sectionTitle) + ")</span>" : "") + "</li>";
+        }).join("") + "</ul>";
+    }
+    return html;
+  }
+
+  /* ---------- record yang disimpan ---------- */
   function newId() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
+
+  function buildRecord(def, data, result) {
+    var info = data.info || (data.info = {});
+    info.assetId = String(info.assetId || "").trim();
+    info.auditor = String(info.auditor || "").trim();
+
+    // Kelompokkan section menurut "role" di definisi: specifications / checklist / license
+    var parts = { specifications: {}, checklist: {}, license: {} };
+    def.steps.forEach(function (step) {
+      step.sections.forEach(function (sec) {
+        if (!sec.role || !parts[sec.role] || !data[sec.id]) return;
+        for (var k in data[sec.id]) parts[sec.role][k] = data[sec.id][k];
+      });
+    });
+
+    return {
+      schemaVersion: 2,
+      id: newId(),
+      assetId: info.assetId,
+      deviceType: def.id,
+      deviceLabel: def.label,
+      auditor: info.auditor,
+      tanggal: info.tanggal,
+      specifications: parts.specifications,
+      checklist: parts.checklist,
+      license: parts.license,
+      scoring: {
+        ok: result.ok,
+        notOk: result.notOk,
+        na: result.na,
+        total: result.total,
+        counted: result.counted,
+        score: result.score,          // 2 desimal; null jika belum dapat dinilai
+        condition: result.condition
+      },
+      condition: result.condition,
+      status: "Selesai",
+      createdAt: new Date().toISOString(),
+      data: data                      // salinan lengkap per section, dipakai untuk menampilkan ulang audit
+    };
   }
 
   /* ---------- komponen utama ---------- */
@@ -211,7 +290,7 @@
     function progressHtml() {
       var title = draft.step < def.steps.length ? def.steps[draft.step].title : "Review";
       var segs = "";
-      for (var i = 0; i < total; i++) segs += '<span' + (i <= draft.step ? ' class="is-done"' : "") + "></span>";
+      for (var i = 0; i < total; i++) segs += "<span" + (i <= draft.step ? ' class="is-done"' : "") + "></span>";
       return (
         '<div class="progress">' +
           '<p class="progress__text">Langkah ' + (draft.step + 1) + " dari " + total + " · " + esc(title) + "</p>" +
@@ -223,17 +302,20 @@
     function draw() {
       var isReview = draft.step >= def.steps.length;
       var result = AA.scoring.evaluate(def, draft.data);
+      var missingAll = isReview ? validateAll(def, draft.data) : [];
+      var blocked = missingAll.length > 0;
       var body;
 
       if (isReview) {
         body =
           '<h2 class="wizard__title">Review Audit</h2>' +
-          '<p class="wizard__hint">Periksa kembali data sebelum disimpan.</p>' +
-          AA.components.scoreCard.render(result, { precise: true }) +
-          summaryHtml(result) +
-          def.steps.map(function (st) {
-            return st.sections.map(function (sec) { return review(sec, draft.data); }).join("");
-          }).join("");
+          '<p class="wizard__hint">Periksa kembali data sebelum disubmit.</p>' +
+          (blocked
+            ? '<div class="notice notice--error" role="alert">' + errorHtml(missingAll, true) +
+              '<button type="button" class="btn btn--secondary" data-action="fix">Lengkapi Sekarang</button></div>'
+            : "") +
+          reviewGroupsHtml(def, draft.data) +
+          scoringPreviewHtml(result);
       } else {
         var step = def.steps[draft.step];
         body =
@@ -245,15 +327,16 @@
         '<div class="wizard">' +
           '<div class="page-head"><h1>Audit ' + esc(def.label) + "</h1></div>" +
           progressHtml() +
-          '<p class="notice notice--error" id="wizard-error" role="alert" hidden></p>' +
+          '<div class="notice notice--error" id="wizard-error" role="alert" hidden></div>' +
           body +
           '<div class="wizard-actions">' +
-            '<button type="button" class="btn btn--secondary" data-action="back">Kembali</button>' +
-            '<button type="button" class="btn" data-action="next">' + (isReview ? "Simpan Audit" : "Lanjut") + "</button>" +
+            '<button type="button" class="btn btn--secondary" data-action="back">' + (isReview ? "Kembali Edit" : "Kembali") + "</button>" +
+            '<button type="button" class="btn" data-action="next"' + (blocked ? " disabled" : "") + ">" +
+              (isReview ? "Submit Audit" : "Lanjut") + "</button>" +
           "</div>" +
         "</div>";
 
-      bind(container.querySelector(".wizard"), isReview);
+      bind(container.querySelector(".wizard"), isReview, missingAll);
 
       if (!firstDraw) {
         window.scrollTo(0, 0);
@@ -262,7 +345,7 @@
       firstDraw = false;
     }
 
-    function bind(root, isReview) {
+    function bind(root, isReview, missingAll) {
       var errorEl = root.querySelector("#wizard-error");
 
       function onInput(e) {
@@ -292,6 +375,7 @@
       root.addEventListener("input", onInput);
       root.addEventListener("change", onInput);
 
+      // Kembali / Kembali Edit: data draft tetap tersimpan di AA.draft
       root.querySelector('[data-action="back"]').addEventListener("click", function () {
         if (draft.step === 0) {
           location.hash = "#/mulai-audit";
@@ -301,12 +385,20 @@
         }
       });
 
+      var fix = root.querySelector('[data-action="fix"]');
+      if (fix) {
+        fix.addEventListener("click", function () {
+          draft.step = missingAll[0].stepIndex;
+          draw();
+        });
+      }
+
       root.querySelector('[data-action="next"]').addEventListener("click", function () {
         if (isReview) return save();
 
-        var missing = validate(def.steps[draft.step], draft.data);
+        var missing = validateStep(def.steps[draft.step], draft.step, draft.data);
         if (missing.length) {
-          errorEl.textContent = errorMessage(missing);
+          errorEl.innerHTML = errorHtml(missing, false);
           errorEl.hidden = false;
           missing.forEach(function (m) {
             var el = root.querySelector('[data-field-path="' + m.path + '"],[data-item-path="' + m.path + '"]');
@@ -321,24 +413,10 @@
     }
 
     function save() {
-      var result = AA.scoring.evaluate(def, draft.data);
-      var record = {
-        id: newId(),
-        deviceType: def.id,
-        deviceLabel: def.label,
-        status: "Selesai",
-        savedAt: new Date().toISOString(),
-        scoring: {
-          ok: result.ok,
-          notOk: result.notOk,
-          na: result.na,
-          total: result.total,
-          counted: result.counted,
-          score: result.score,         // null jika belum dapat dinilai
-          condition: result.condition
-        },
-        data: draft.data
-      };
+      // Penjaga terakhir: tidak boleh submit jika masih ada checklist/data wajib yang kosong
+      if (validateAll(def, draft.data).length) { draw(); return; }
+
+      var record = buildRecord(def, draft.data, AA.scoring.evaluate(def, draft.data));
       AA.storage.add(record);
       AA.draft.clear(def.id);
       location.hash = "#/audit-selesai/" + record.id;

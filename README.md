@@ -1,19 +1,19 @@
-# Asset Audit — V0.3
+# Asset Audit — V0.4
 
-Aplikasi audit perangkat perusahaan. V0.3: **Audit Laptop** dengan **scoring otomatis** (nilai & kondisi).
+Aplikasi audit perangkat perusahaan. V0.4: **Audit Laptop** dengan scoring otomatis, halaman Hasil Audit yang lengkap, Review sebelum submit, dan Riwayat yang bisa dibuka detailnya.
 Tanpa backend, database, API, atau login. Data audit disimpan sementara di `localStorage` browser.
 
 ## Cara menjalankan
 Buka `index.html` langsung di browser (klik dua kali). Tidak perlu server.
 
-## Scoring (V0.3)
-Nilai Audit = OK ÷ (OK + Tidak OK) × 100. N/A tidak dihitung. Jika tidak ada item yang dihitung -> "Belum dapat dinilai".
+## Scoring
+Nilai Audit = OK ÷ (OK + Tidak OK) × 100. N/A tidak dihitung. Selalu tampil 2 desimal (83.33%). Jika tidak ada item yang dihitung -> "Belum dapat dinilai".
 80–100 Baik · 60–79 Cukup · 40–59 Rusak Ringan · 0–39 Rusak Berat.
 Item yang dinilai = section berlabel `scored: true` di `js/audit-defs/*.js` (Laptop: Cek Fisik + Lisensi).
 Semua perhitungan ada di satu tempat: `js/utils/scoring.js`. Uji rumus: `node tests/scoring.test.js`.
 
 ## Alur
-Dashboard → Mulai Audit → Laptop → Identitas → Spesifikasi → Cek Fisik → Lisensi → Review → Simpan Audit → Audit Selesai → Riwayat Audit
+Dashboard → Mulai Audit → Laptop → Identitas → Spesifikasi → Cek Fisik → Lisensi → Review → Submit Audit → Hasil Audit → Riwayat Audit → (klik baris) Detail Hasil Audit
 
 ## Struktur
 - `index.html` — kerangka halaman + urutan pemuatan script
@@ -21,12 +21,12 @@ Dashboard → Mulai Audit → Laptop → Identitas → Spesifikasi → Cek Fisik
 - `js/config.js` — nama app, versi, menu, halaman tersembunyi, jenis perangkat
 - `js/data/`
   - `dummy-data.js` — data dummy Dashboard (V0.1)
-  - `audit-storage.js` — baca/tulis audit tersimpan (localStorage)
+  - `audit-storage.js` — baca/tulis audit tersimpan (localStorage). Field record: id, assetId, deviceType, auditor, tanggal, specifications, checklist, license, scoring, condition, status, createdAt (+ `data` = salinan lengkap per section)
   - `audit-draft.js` — draft audit yang sedang diisi (memori)
 - `js/utils/` — `dom.js` (escape HTML), `date.js` (tanggal), `scoring.js` (rumus nilai & kondisi)
-- `js/components/` — `icons.js`, `stat-card.js`, `data-table.js`, `score-card.js` (kartu nilai), `audit-wizard.js` (form audit untuk semua perangkat)
+- `js/components/` — `icons.js`, `stat-card.js`, `data-table.js`, `score-card.js` (kartu nilai), `audit-result.js` (tampilan Hasil Audit), `audit-wizard.js` (form audit untuk semua perangkat)
 - `js/audit-defs/` — `common.js` (bagian umum), `laptop.js` (isi form Audit Laptop)
-- `js/pages/` — `dashboard`, `start-audit`, `history`, `audit-laptop`, `audit-done`
+- `js/pages/` — `dashboard`, `start-audit`, `history`, `audit-laptop`, `audit-done`, `audit-detail`
 - `tests/scoring.test.js` — uji rumus scoring (Node, tanpa library)
 - `js/router.js`, `js/app.js` — navigasi & titik masuk
 

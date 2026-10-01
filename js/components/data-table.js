@@ -1,10 +1,13 @@
 /* Tabel generik.
    columns: [{ key, label, className?, render?(row) }]
+   opts.rowHref(row): jika diisi, baris bisa diklik (data-href). Pembuka halamannya diatur oleh pemanggil.
    Atribut data-label dipakai CSS agar tabel menjadi kartu di layar HP. */
 (function (AA) {
   var esc = AA.utils.escapeHtml;
 
-  AA.components.dataTable = function (columns, rows) {
+  AA.components.dataTable = function (columns, rows, opts) {
+    opts = opts || {};
+
     var head = columns.map(function (c) {
       var cls = c.className ? ' class="' + c.className + '"' : "";
       return '<th scope="col"' + cls + ">" + esc(c.label) + "</th>";
@@ -16,7 +19,9 @@
         var cls = c.className ? ' class="' + c.className + '"' : "";
         return '<td data-label="' + esc(c.label) + '"' + cls + ">" + content + "</td>";
       }).join("");
-      return "<tr>" + cells + "</tr>";
+      var href = opts.rowHref ? opts.rowHref(row) : "";
+      var attrs = href ? ' class="is-clickable" data-href="' + esc(href) + '"' : "";
+      return "<tr" + attrs + ">" + cells + "</tr>";
     }).join("");
 
     return (

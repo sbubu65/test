@@ -352,3 +352,81 @@ textarea.field__input { min-height: 80px; resize: vertical; }
   .score-card { padding: 20px 24px; }
   .score-card__value { font-size: 52px; }
 }
+
+/* =====================================================
+   V0.4 — Hasil Audit, Review, Riwayat
+   ===================================================== */
+
+
+/* Daftar kesalahan validasi di dalam kotak notifikasi */
+.notice--error p + p, .notice--error p + ul { margin-top: 8px; }
+.notice__list { margin: 8px 0 0; padding-left: 20px; font-weight: 500; }
+.notice__list li span { font-weight: 400; opacity: .85; }
+.notice--error .btn { margin-top: 12px; }
+
+/* ---------- Kartu nilai: varian besar untuk Hasil Audit ---------- */
+.score-card { --tone-bg: var(--neutral-tint); }
+.score-card[data-tone="baik"]   { --tone-bg: var(--primary-tint); }
+.score-card[data-tone="cukup"]  { --tone-bg: var(--warn-tint); }
+.score-card[data-tone="ringan"] { --tone-bg: #FDE6D8; }
+.score-card[data-tone="berat"]  { --tone-bg: var(--danger-tint); }
+
+.score-card--hero {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: var(--tone-bg);
+  border-color: transparent;
+  border-top-color: var(--tone);
+}
+.score-card--hero .score-card__value { font-size: 56px; }
+.score-card--hero .score-card__cond { font-size: 20px; }
+.score-card--hero .score-bar { background: rgba(255, 255, 255, .7); height: 12px; border-radius: 6px; }
+.score-card--hero .score-card__counts { color: var(--ink); }
+
+/* ---------- Susunan halaman Hasil Audit ---------- */
+.result-top { display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 16px; }
+.result-top > .card, .result-top > .score-card { margin-bottom: 0; }
+.result-action { margin-top: 8px; }
+
+.stat-grid--5 { margin-bottom: 16px; }
+.stat-grid--5 .stat-card:last-child { grid-column: 1 / -1; } /* HP: 2 kolom, kartu ke-5 selebar layar */
+.stat-card--bad { border-top-color: var(--danger); }
+
+/* ---------- Daftar item Tidak OK / N/A ---------- */
+.item-list { margin: 0; padding: 0; list-style: none; }
+.item-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.item-list li:first-child { padding-top: 0; }
+.item-list li:last-child { padding-bottom: 0; border-bottom: 0; }
+.item-list__name { font-weight: 600; }
+.item-list--bad .item-list__name { color: var(--danger); }
+.item-list__meta { font-size: 14px; color: var(--ink-soft); }
+.item-list__note { flex-basis: 100%; font-size: 14px; color: var(--ink-soft); }
+.result-empty { color: var(--ink-soft); font-weight: 500; }
+.result-note { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+
+/* ---------- Riwayat: baris bisa diklik ---------- */
+.data-table tr.is-clickable { cursor: pointer; }
+.data-table tr.is-clickable:hover td { background: var(--paper); }
+.row-link { font-weight: 700; color: var(--primary-dark); text-decoration: none; }
+.row-link:hover { text-decoration: underline; }
+
+@media (max-width: 639px) {
+  .data-table tr.is-clickable:hover { background: var(--paper); }
+  .data-table tr.is-clickable:hover td { background: none; }
+}
+
+@media (min-width: 768px) {
+  .result-top { grid-template-columns: 1fr 1fr; align-items: stretch; }
+  .stat-grid--5 { grid-template-columns: repeat(5, 1fr); }
+  .stat-grid--5 .stat-card:last-child { grid-column: auto; }
+  .stat-grid--5 .stat-card__value { font-size: 32px; }
+  .score-card--hero .score-card__value { font-size: 64px; }
+}

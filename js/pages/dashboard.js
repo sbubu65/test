@@ -16,7 +16,7 @@
           card({ label: "Total Audit",          value: s.total }) +
           card({ label: "Audit Selesai",        value: s.selesai,       tone: "ok" }) +
           card({ label: "Audit Belum Selesai",  value: s.belumSelesai,  tone: "warn" }) +
-          card({ label: "Rata-rata Nilai Audit", value: s.rataRataNilai + "%" }) +
+          card({ label: "Rata-rata Nilai Audit", value: AA.scoring.formatPercent(s.rataRataNilai) }) +
         "</div>" +
         '<div class="section-action">' +
           '<a class="btn btn--block" href="#/mulai-audit">Mulai Audit</a>' +

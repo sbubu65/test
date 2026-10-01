@@ -4,7 +4,10 @@
      "fields"    -> kolom isian teks            (fields: [{ id, label, type?, placeholder?, required? }])
      "checklist" -> OK / Tidak OK / N/A, catatan muncul jika Tidak OK   (items: [{ id, label }])
      "license"   -> status + satu isian tambahan + catatan              (items: [{ id, label, extraLabel }])
-   Tambahkan  scored: true  pada section checklist/license agar ikut dihitung dalam Nilai Audit.
+   Properti section lain:
+     scored: true      -> ikut dihitung dalam Nilai Audit (checklist/license)
+     role              -> kolom di record tersimpan: "specifications" | "checklist" | "license"
+     reviewGroup       -> judul kartu di halaman Review (section dengan judul sama digabung)
    Untuk perangkat lain (V0.x berikutnya): salin file ini dan ubah isinya. */
 (function (AA) {
   AA.auditDefs.laptop = {
@@ -21,6 +24,7 @@
             id: "laptop",
             title: "Identitas Laptop",
             type: "fields",
+            role: "specifications", reviewGroup: "Spesifikasi",
             fields: [
               { id: "brand",  label: "Brand" },
               { id: "model",  label: "Model" },
@@ -37,6 +41,7 @@
             id: "spec",
             title: "Spesifikasi",
             type: "fields",
+            role: "specifications", reviewGroup: "Spesifikasi",
             fields: [
               { id: "processor", label: "Processor" },
               { id: "ram",       label: "RAM" },
@@ -55,6 +60,7 @@
             id: "fisik",
             title: "Cek Fisik",
             type: "checklist",
+            role: "checklist", reviewGroup: "Checklist",
             scored: true, // ikut dihitung dalam Nilai Audit
             items: [
               { id: "body",       label: "Body" },
@@ -82,6 +88,7 @@
             id: "lisensi",
             title: "Pemeriksaan Lisensi",
             type: "license",
+            role: "license", reviewGroup: "Lisensi",
             scored: true,
             items: [
               { id: "windows",   label: "Windows",          extraLabel: "Versi Windows" },
