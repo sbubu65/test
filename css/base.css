@@ -10,6 +10,9 @@
   --primary-tint: #E3F2EE;
   --warn: #A85F00;
   --warn-tint: #FDF1DA;
+  --danger: #B3261E;
+  --danger-tint: #FBE7E5;
+  --neutral-tint: #E9EEED;
 
   --radius-card: 16px;
   --radius-control: 12px;
