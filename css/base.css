@@ -1,0 +1,45 @@
+/* Token desain & reset dasar */
+:root {
+  --paper: #F4F7F6;
+  --surface: #FFFFFF;
+  --ink: #102A2D;
+  --ink-soft: #52696C;
+  --line: #DCE4E2;
+  --primary: #0B7A66;
+  --primary-dark: #085F4F;
+  --primary-tint: #E3F2EE;
+  --warn: #A85F00;
+  --warn-tint: #FDF1DA;
+
+  --radius-card: 16px;
+  --radius-control: 12px;
+  --tap: 48px; /* tinggi minimum area sentuh */
+
+  --font: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+h1, h2, h3, p { margin: 0; }
+
+button { font: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

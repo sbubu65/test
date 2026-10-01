@@ -1,0 +1,99 @@
+/* Header, navigasi, dan kerangka halaman */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.app-header__inner {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 16px;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand__name { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+.brand__version {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary-dark);
+  background: var(--primary-tint);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+/* Navigasi: di HP berada di bawah layar (mudah dijangkau ibu jari) */
+.nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.nav__link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 64px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-decoration: none;
+}
+.nav__link svg { width: 24px; height: 24px; }
+.nav__link[aria-current="page"] { color: var(--primary); }
+.nav__link[aria-current="page"] svg { stroke-width: 2.4; }
+
+.app-main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 20px 16px calc(96px + env(safe-area-inset-bottom, 0px));
+  outline: none;
+}
+
+.page-head { margin-bottom: 20px; }
+.page-head h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; }
+.page-head p { margin-top: 4px; color: var(--ink-soft); }
+
+/* Desktop: navigasi pindah ke header */
+@media (min-width: 768px) {
+  .app-header__inner { min-height: 64px; padding: 0 24px; }
+
+  .nav {
+    position: static;
+    display: flex;
+    gap: 4px;
+    background: none;
+    border: 0;
+    padding: 0;
+  }
+  .nav__link {
+    flex-direction: row;
+    gap: 8px;
+    min-height: 40px;
+    padding: 0 14px;
+    font-size: 15px;
+    border-radius: var(--radius-control);
+  }
+  .nav__link svg { width: 20px; height: 20px; }
+  .nav__link:hover { background: var(--paper); }
+  .nav__link[aria-current="page"] { background: var(--primary-tint); }
+
+  .app-main { padding: 32px 24px 48px; }
+  .page-head h1 { font-size: 30px; }
+}
