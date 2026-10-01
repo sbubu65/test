@@ -1,6 +1,5 @@
 /* Halaman Mulai Audit: pilih jenis perangkat, lalu tekan "Mulai Audit".
-   V0.1: tombol belum menjalankan audit. Di versi berikutnya, handler tombol
-   akan membuka form audit untuk jenis perangkat yang dipilih. */
+   Jika perangkat punya "auditRoute" di config.js, user diarahkan ke halaman audit-nya. */
 (function (AA) {
   var esc = AA.utils.escapeHtml;
 
@@ -48,8 +47,14 @@
 
       btn.addEventListener("click", function () {
         if (!selected) return;
-        notice.textContent = "Perangkat dipilih: " + selected.label +
-          ". Form audit akan tersedia di versi berikutnya.";
+
+        if (selected.auditRoute) {
+          AA.draft.reset(selected.id); // mulai dari form kosong
+          location.hash = "#/" + selected.auditRoute;
+          return;
+        }
+
+        notice.textContent = "Audit " + selected.label + " belum tersedia. Saat ini baru Audit Laptop yang bisa dilakukan.";
         notice.hidden = false;
       });
     }
