@@ -3,7 +3,7 @@
 window.AssetAudit = {
   config: {
     appName: "Asset Audit",
-    version: "V0.2",
+    version: "V0.3",
     defaultRoute: "dashboard",
 
     // Daftar halaman.

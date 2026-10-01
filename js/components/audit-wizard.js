@@ -151,6 +151,23 @@
     return '<section class="card"><h2>' + esc(sec.title) + '</h2><dl class="review-list">' + rows + "</dl></section>";
   }
 
+  /* ---------- Ringkasan Pemeriksaan (halaman Review) ---------- */
+  function summaryHtml(r) {
+    var rows =
+      reviewRow("Total item", esc(r.total)) +
+      reviewRow("OK", esc(r.ok)) +
+      reviewRow("Tidak OK", esc(r.notOk)) +
+      reviewRow("N/A", esc(r.na)) +
+      reviewRow("Item dihitung", esc(r.counted)) +
+      reviewRow("Nilai Audit", esc(r.scoreText)) +
+      reviewRow("Kondisi", '<span class="badge badge--' + esc(r.tone) + '">' + esc(r.condition) + "</span>");
+    return '<section class="card"><h2>Ringkasan Pemeriksaan</h2><dl class="review-list">' + rows + "</dl></section>";
+  }
+
+  function hasScoredSections(step) {
+    return step.sections.some(function (sec) { return sec.scored; });
+  }
+
   /* ---------- validasi per langkah ---------- */
   function validate(step, data) {
     var missing = [];
@@ -205,19 +222,23 @@
 
     function draw() {
       var isReview = draft.step >= def.steps.length;
+      var result = AA.scoring.evaluate(def, draft.data);
       var body;
 
       if (isReview) {
         body =
           '<h2 class="wizard__title">Review Audit</h2>' +
           '<p class="wizard__hint">Periksa kembali data sebelum disimpan.</p>' +
+          AA.components.scoreCard.render(result, { precise: true }) +
+          summaryHtml(result) +
           def.steps.map(function (st) {
             return st.sections.map(function (sec) { return review(sec, draft.data); }).join("");
           }).join("");
       } else {
-        body = def.steps[draft.step].sections.map(function (sec) {
-          return formSectionHtml(sec, draft.data);
-        }).join("");
+        var step = def.steps[draft.step];
+        body =
+          (hasScoredSections(step) ? AA.components.scoreCard.render(result) : "") +
+          step.sections.map(function (sec) { return formSectionHtml(sec, draft.data); }).join("");
       }
 
       container.innerHTML =
@@ -251,6 +272,12 @@
         if (t.type === "radio" && !t.checked) return;
 
         setVal(draft.data, path, t.value);
+
+        // Scoring real-time: hitung ulang setiap status berubah
+        if (/\.status$/.test(path)) {
+          var card = root.querySelector(".score-card");
+          if (card) AA.components.scoreCard.update(card, AA.scoring.evaluate(def, draft.data));
+        }
 
         var holder = t.closest("[data-field-path],[data-item-path]");
         if (holder) holder.classList.remove("is-missing");
@@ -294,12 +321,22 @@
     }
 
     function save() {
+      var result = AA.scoring.evaluate(def, draft.data);
       var record = {
         id: newId(),
         deviceType: def.id,
         deviceLabel: def.label,
         status: "Selesai",
         savedAt: new Date().toISOString(),
+        scoring: {
+          ok: result.ok,
+          notOk: result.notOk,
+          na: result.na,
+          total: result.total,
+          counted: result.counted,
+          score: result.score,         // null jika belum dapat dinilai
+          condition: result.condition
+        },
         data: draft.data
       };
       AA.storage.add(record);

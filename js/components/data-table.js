@@ -6,7 +6,8 @@
 
   AA.components.dataTable = function (columns, rows) {
     var head = columns.map(function (c) {
-      return '<th scope="col">' + esc(c.label) + "</th>";
+      var cls = c.className ? ' class="' + c.className + '"' : "";
+      return '<th scope="col"' + cls + ">" + esc(c.label) + "</th>";
     }).join("");
 
     var body = rows.map(function (row) {

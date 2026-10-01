@@ -304,3 +304,51 @@ textarea.field__input { min-height: 80px; resize: vertical; }
   .wizard__title { font-size: 26px; }
   .done h1 { font-size: 30px; }
 }
+
+/* =====================================================
+   V0.3 — Scoring: kartu nilai, progress bar, badge kondisi
+   ===================================================== */
+
+.section-title { margin-bottom: 12px; font-size: 18px; font-weight: 700; }
+
+.score-card {
+  --tone: var(--ink-soft);       /* warna bar & garis atas */
+  --tone-text: var(--ink-soft);  /* warna teks kondisi */
+  margin-bottom: 16px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--tone);
+  border-radius: var(--radius-card);
+}
+.score-card[data-tone="baik"]   { --tone: var(--primary); --tone-text: var(--primary-dark); }
+.score-card[data-tone="cukup"]  { --tone: #E0A100;        --tone-text: #8A5200; }
+.score-card[data-tone="ringan"] { --tone: #E8772E;        --tone-text: #A13D0C; }
+.score-card[data-tone="berat"]  { --tone: var(--danger);  --tone-text: var(--danger); }
+
+.score-card__top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.score-card__label { font-size: 13px; font-weight: 700; letter-spacing: .06em; color: var(--ink-soft); }
+.score-card__value { font-size: 44px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; }
+.score-card__cond { font-size: 16px; font-weight: 800; letter-spacing: .04em; text-align: right; color: var(--tone-text); }
+
+.score-bar { height: 10px; margin: 12px 0; overflow: hidden; background: var(--line); border-radius: 5px; }
+.score-bar span { display: block; width: 0; height: 100%; background: var(--tone); border-radius: 5px; transition: width .3s; }
+
+.score-card__counts { font-size: 14px; font-weight: 500; color: var(--ink-soft); }
+
+/* Badge kondisi (Riwayat & Review). "baik" memakai gaya badge bawaan (hijau). */
+.badge--cukup   { background: var(--warn-tint); color: #8A5200; }
+.badge--ringan  { background: #FDE6D8;          color: #A13D0C; }
+.badge--berat   { background: var(--danger-tint); color: var(--danger); }
+.badge--unrated { background: var(--neutral-tint); color: var(--ink-soft); }
+
+.data-table th.is-num, .data-table td.is-num { text-align: right; }
+
+@media (max-width: 639px) {
+  .data-table td.is-num { text-align: left; } /* di HP baris menjadi kartu */
+}
+
+@media (min-width: 768px) {
+  .score-card { padding: 20px 24px; }
+  .score-card__value { font-size: 52px; }
+}

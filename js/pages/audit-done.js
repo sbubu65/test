@@ -1,4 +1,4 @@
-/* Halaman Audit Selesai. Menerima id audit dari URL: #/audit-selesai/<id> */
+/* Halaman Audit Selesai (Hasil Audit). Menerima id audit dari URL: #/audit-selesai/<id> */
 (function (AA) {
   var esc = AA.utils.escapeHtml;
 
@@ -21,6 +21,7 @@
       }
 
       var info = (rec.data && rec.data.info) || {};
+      var result = AA.scoring.forRecord(rec);
       var warning = AA.storage.lastWriteOk ? "" :
         '<p class="notice notice--error">Browser memblokir penyimpanan. Audit hanya tersimpan selama halaman ini terbuka.</p>';
 
@@ -31,6 +32,8 @@
           "<p>Data audit sudah disimpan.</p>" +
         "</div>" +
         warning +
+        '<h2 class="section-title">Hasil Audit</h2>' +
+        AA.components.scoreCard.render(result, { precise: true }) +
         '<section class="card"><dl class="review-list">' +
           row("Asset ID", info.assetId) +
           row("Jenis Perangkat", rec.deviceLabel) +

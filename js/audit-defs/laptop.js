@@ -4,6 +4,7 @@
      "fields"    -> kolom isian teks            (fields: [{ id, label, type?, placeholder?, required? }])
      "checklist" -> OK / Tidak OK / N/A, catatan muncul jika Tidak OK   (items: [{ id, label }])
      "license"   -> status + satu isian tambahan + catatan              (items: [{ id, label, extraLabel }])
+   Tambahkan  scored: true  pada section checklist/license agar ikut dihitung dalam Nilai Audit.
    Untuk perangkat lain (V0.x berikutnya): salin file ini dan ubah isinya. */
 (function (AA) {
   AA.auditDefs.laptop = {
@@ -54,6 +55,7 @@
             id: "fisik",
             title: "Cek Fisik",
             type: "checklist",
+            scored: true, // ikut dihitung dalam Nilai Audit
             items: [
               { id: "body",       label: "Body" },
               { id: "layar",      label: "Layar" },
@@ -80,6 +82,7 @@
             id: "lisensi",
             title: "Pemeriksaan Lisensi",
             type: "license",
+            scored: true,
             items: [
               { id: "windows",   label: "Windows",          extraLabel: "Versi Windows" },
               { id: "office",    label: "Microsoft Office", extraLabel: "Versi" },

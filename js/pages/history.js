@@ -1,4 +1,5 @@
-/* Halaman Riwayat Audit: menampilkan audit yang tersimpan di browser (localStorage). */
+/* Halaman Riwayat Audit: audit tersimpan di browser (localStorage), lengkap dengan Nilai dan Kondisi
+   dari hasil scoring. */
 (function (AA) {
   var esc = AA.utils.escapeHtml;
 
@@ -8,11 +9,15 @@
     render: function (container) {
       var rows = AA.storage.list().map(function (rec) {
         var info = (rec.data && rec.data.info) || {};
+        var sc = AA.scoring.forRecord(rec);
         return {
           tanggal: AA.utils.formatDateID(info.tanggal),
           assetId: info.assetId,
           jenis: rec.deviceLabel,
           auditor: info.auditor,
+          nilai: sc.scoreText,
+          kondisi: sc.condition,
+          tone: sc.tone,
           status: rec.status
         };
       });
@@ -30,6 +35,8 @@
           { key: "assetId", label: "Asset ID" },
           { key: "jenis",   label: "Jenis" },
           { key: "auditor", label: "Auditor" },
+          { key: "nilai",   label: "Nilai", className: "is-num" },
+          { key: "kondisi", label: "Kondisi", render: function (r) { return '<span class="badge badge--' + esc(r.tone) + '">' + esc(r.kondisi) + "</span>"; } },
           { key: "status",  label: "Status", render: function (r) { return '<span class="badge">' + esc(r.status) + "</span>"; } }
         ], rows);
       }
