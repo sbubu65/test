@@ -4,7 +4,8 @@
 
    Bentuk satu record (V0.4, schemaVersion 2):
    { schemaVersion, id (audit ID), assetId, deviceType, deviceLabel, auditor, tanggal,
-     specifications, checklist, license, scoring, condition, status, createdAt,
+     specifications, checklist, license, scoring, score, condition, status, createdAt,
+     auditId, syncStatus ("pending" | "synced" | "failed"), syncMessage,
      data }   <- data = salinan lengkap per section; dipakai aplikasi untuk menampilkan ulang audit
    Record V0.2/V0.3 (tanpa field di atas, memakai savedAt) tetap terbaca lewat basics()/createdOf(). */
 (function (AA) {
@@ -57,6 +58,16 @@
 
     get: function (id) {
       return read().filter(function (r) { return r.id === id; })[0] || null;
+    },
+
+    // Ubah sebagian field satu audit (mis. syncStatus). Return record terbaru, atau null jika tidak ada.
+    update: function (id, patch) {
+      var list = read();
+      var rec = list.filter(function (r) { return r.id === id; })[0];
+      if (!rec) return null;
+      for (var k in patch) rec[k] = patch[k];
+      this.lastWriteOk = write(list);
+      return rec;
     },
 
     add: function (record) {

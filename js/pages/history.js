@@ -19,7 +19,9 @@
           nilai: sc.scoreText,
           kondisi: sc.condition,
           tone: sc.tone,
-          status: rec.status
+          status: rec.status,
+          sync: AA.sync.shortLabel(rec),
+          synced: AA.sync.isSynced(rec)
         };
       });
 
@@ -44,7 +46,10 @@
         { key: "kondisi", label: "Kondisi", render: function (r) {
             return '<span class="badge badge--' + esc(r.tone) + '">' + esc(r.kondisi) + "</span>";
         } },
-        { key: "status",  label: "Status", render: function (r) { return '<span class="badge">' + esc(r.status) + "</span>"; } }
+        { key: "status",  label: "Status", render: function (r) { return '<span class="badge">' + esc(r.status) + "</span>"; } },
+        { key: "sync",    label: "Sync", render: function (r) {
+            return '<span class="badge badge--' + (r.synced ? "synced" : "unsynced") + '">' + esc(r.sync) + "</span>";
+        } }
       ], rows, { rowHref: function (r) { return "#/hasil-audit/" + r.id; } });
 
       container.innerHTML =

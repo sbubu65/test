@@ -3,8 +3,24 @@
 window.AssetAudit = {
   config: {
     appName: "Asset Audit",
-    version: "V0.4",
+    version: "V0.5",
     defaultRoute: "dashboard",
+
+    // ============================================================================================
+    // KONFIGURASI GOOGLE APPS SCRIPT  —  SATU-SATUNYA tempat URL API diisi.
+    //
+    // WAJIB DIGANTI: setelah Anda men-deploy Apps Script sebagai Web App, salin URL-nya
+    // (berakhiran /exec) lalu tempel di bawah, menggantikan teks PASTE_...
+    //   Contoh: "https://script.google.com/macros/s/AKfycb.../exec"
+    //
+    // Selama masih berisi PASTE_..., audit tetap tersimpan di perangkat tetapi
+    // statusnya "Belum Tersinkron".
+    // JANGAN menaruh API key / password di sini: file ini bisa dibaca siapa pun yang membuka web.
+    // ============================================================================================
+    api: {
+      API_URL: "PASTE_GOOGLE_APPS_SCRIPT_URL_DI_SINI",
+      timeoutMs: 20000   // batas waktu menunggu respons (milidetik)
+    },
 
     // Daftar halaman.
     // - Tanpa "hidden": tampil di menu utama.

@@ -21,6 +21,26 @@
     }).join("") + "</ul>";
   }
 
+  /* Panel status sinkronisasi. Sukses -> banner hijau (hanya setelah submit). Belum tersinkron ->
+     pesan + tombol "Coba Sinkronkan Lagi" (mengirim ulang data dari localStorage dengan auditId yang sama). */
+  function syncPanel(rec, mode) {
+    if (AA.sync.isSynced(rec)) {
+      return mode === "done"
+        ? '<div class="notice notice--ok" role="status"><strong>Audit berhasil disimpan</strong><br>Tersimpan ke Spreadsheet.</div>'
+        : "";
+    }
+    if (AA.sync.isBusy(rec.id)) {
+      return '<div class="notice notice--info" role="status">Menyinkronkan audit...</div>';
+    }
+    var msg = rec.syncStatus === "failed"
+      ? (rec.syncMessage || AA.api.messages.fail)
+      : "Audit ini belum dikirim ke Spreadsheet. Data tersimpan di perangkat ini.";
+    return (
+      '<div class="notice notice--error" role="alert"><p>' + esc(msg) + "</p>" +
+      '<button type="button" class="btn btn--secondary" data-action="retry-sync">Coba Sinkronkan Lagi</button></div>'
+    );
+  }
+
   function body(rec) {
     var b = AA.storage.basics(rec);
     var r = AA.scoring.forRecord(rec);
@@ -43,6 +63,7 @@
           row("Nama Auditor", esc(b.auditor || "-")) +
           row("Tanggal Audit", esc(AA.utils.formatDateID(b.tanggal) || "-")) +
           row("Device Type", esc(rec.deviceLabel || "-")) +
+          row("Sinkronisasi", '<span class="badge badge--' + (AA.sync.isSynced(rec) ? "synced" : "unsynced") + '">' + esc(AA.sync.label(rec)) + "</span>") +
         "</dl></section>" +
         AA.components.scoreCard.render(r, { hero: true }) +
       "</div>" +
@@ -96,17 +117,30 @@
           '<div class="done">' +
             '<div class="done-mark">' + AA.components.icon("audit") + "</div>" +
             "<h1>Audit Selesai</h1>" +
-            "<p>Data audit sudah disimpan.</p>" +
+            "<p>" + (AA.sync.isSynced(rec) ? "Data audit sudah disimpan." : "Data audit disimpan di perangkat ini.") + "</p>" +
           "</div>" + warning;
         action = '<a class="btn btn--block" href="#/riwayat">Lihat Riwayat Audit</a>';
       } else {
         head =
           '<div class="page-head"><h1>Detail Hasil Audit</h1>' +
-          "<p>Hasil audit yang tersimpan. Data tidak dapat diubah.</p></div>";
+          "<p>Hasil audit yang tersimpan. Data audit tidak dapat diubah.</p></div>";
         action = '<a class="btn btn--secondary btn--block" href="#/riwayat">Kembali ke Riwayat</a>';
       }
 
-      container.innerHTML = head + body(rec) + '<div class="result-action">' + action + "</div>";
+      container.innerHTML = head + syncPanel(rec, mode) + body(rec) + '<div class="result-action">' + action + "</div>";
+
+      // Coba Sinkronkan Lagi: kirim ulang dari localStorage, lalu tampilkan status terbaru
+      var retry = container.querySelector('[data-action="retry-sync"]');
+      if (retry) {
+        retry.addEventListener("click", function () {
+          retry.disabled = true;
+          retry.textContent = "Menyinkronkan...";
+          var hash = location.hash;
+          AA.sync.push(rec.id).then(function () {
+            if (location.hash === hash) AA.components.auditResult.mount(container, id, mode); // jangan menimpa halaman lain
+          });
+        });
+      }
     }
   };
 })(window.AssetAudit);

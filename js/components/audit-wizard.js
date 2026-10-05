@@ -236,11 +236,8 @@
   }
 
   /* ---------- record yang disimpan ---------- */
-  function newId() {
-    return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  }
-
   function buildRecord(def, data, result) {
+    var auditId = AA.api.newAuditId(); // unik; juga dipakai Apps Script untuk mencegah data ganda
     var info = data.info || (data.info = {});
     info.assetId = String(info.assetId || "").trim();
     info.auditor = String(info.auditor || "").trim();
@@ -256,7 +253,8 @@
 
     return {
       schemaVersion: 2,
-      id: newId(),
+      id: auditId,
+      auditId: auditId,
       assetId: info.assetId,
       deviceType: def.id,
       deviceLabel: def.label,
@@ -274,8 +272,11 @@
         score: result.score,          // 2 desimal; null jika belum dapat dinilai
         condition: result.condition
       },
+      score: result.score,
       condition: result.condition,
       status: "Selesai",
+      syncStatus: "pending",  // pending | synced | failed (diubah oleh AA.sync)
+      syncMessage: "",
       createdAt: new Date().toISOString(),
       data: data                      // salinan lengkap per section, dipakai untuk menampilkan ulang audit
     };
@@ -286,6 +287,7 @@
     var draft = AA.draft.ensure(def.id);
     var total = def.steps.length + 1; // + layar Review
     var firstDraw = true;
+    var submitting = false; // true selama audit sedang disimpan/dikirim: cegah submit ganda
 
     function progressHtml() {
       var title = draft.step < def.steps.length ? def.steps[draft.step].title : "Review";
@@ -412,14 +414,39 @@
       });
     }
 
+    // Tampilan "sedang menyimpan": tombol dinonaktifkan agar tidak bisa di-submit berkali-kali
+    function showSaving() {
+      var root = container.querySelector(".wizard");
+      var next = root.querySelector('[data-action="next"]');
+      root.setAttribute("aria-busy", "true");
+      next.disabled = true;
+      next.classList.add("is-loading");
+      next.textContent = "Menyimpan audit...";
+      root.querySelector('[data-action="back"]').disabled = true;
+      root.querySelector(".wizard-actions").insertAdjacentHTML("afterend",
+        '<p class="loading-note" role="status">Menyimpan audit... Mohon tunggu, jangan tutup halaman ini.</p>');
+    }
+
     function save() {
+      if (submitting) return;
+
       // Penjaga terakhir: tidak boleh submit jika masih ada checklist/data wajib yang kosong
       if (validateAll(def, draft.data).length) { draw(); return; }
 
+      submitting = true;
+      showSaving();
+      var routeAtSubmit = location.hash;
+
+      // 1) Simpan ke localStorage dulu: data aman walaupun pengiriman gagal
       var record = buildRecord(def, draft.data, AA.scoring.evaluate(def, draft.data));
       AA.storage.add(record);
       AA.draft.clear(def.id);
-      location.hash = "#/audit-selesai/" + record.id;
+
+      // 2) Kirim ke Spreadsheet (selalu selesai dengan sukses/gagal, tidak melempar error),
+      //    lalu tampilkan Hasil Audit lengkap dengan status sinkronisasinya.
+      AA.sync.push(record.id).then(function () {
+        if (location.hash === routeAtSubmit) location.hash = "#/audit-selesai/" + record.id;
+      });
     }
 
     draw();
