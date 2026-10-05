@@ -56,8 +56,9 @@
       };
     },
 
+    // Cari berdasarkan id lokal ATAU auditId
     get: function (id) {
-      return read().filter(function (r) { return r.id === id; })[0] || null;
+      return read().filter(function (r) { return r.id === id || r.auditId === id; })[0] || null;
     },
 
     // Ubah sebagian field satu audit (mis. syncStatus). Return record terbaru, atau null jika tidak ada.

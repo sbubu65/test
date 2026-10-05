@@ -460,3 +460,47 @@ textarea.field__input { min-height: 80px; resize: vertical; }
 @media (min-width: 640px) and (max-width: 899px) {
   .data-table th, .data-table td { padding: 12px 8px; font-size: 14px; }
 }
+
+/* =====================================================
+   V0.6 — Riwayat: cari, filter, urutkan, pagination, Refresh
+   ===================================================== */
+
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; }
+
+.page-head--row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.btn--small { min-height: 44px; padding: 0 16px; font-size: 15px; }
+
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  vertical-align: -2px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+
+.history-status { margin-bottom: 12px; font-size: 14px; color: var(--ink-soft); }
+#history-status .notice { margin: 0 0 12px; }
+.history-count { margin-bottom: 8px; font-size: 14px; font-weight: 500; color: var(--ink-soft); }
+
+/* Filter */
+.filters { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.field--search { grid-column: 1 / -1; }
+.filters__custom { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.filters__custom[hidden] { display: none; }
+select.field__input { appearance: auto; }
+
+/* Pagination */
+.pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; }
+.pager__info { font-size: 14px; font-weight: 600; color: var(--ink-soft); text-align: center; }
+
+@media (min-width: 640px) {
+  .filters { grid-template-columns: repeat(3, 1fr); }
+}
+@media (min-width: 900px) {
+  .filters { grid-template-columns: repeat(5, 1fr); }
+  .filters__custom { grid-template-columns: repeat(2, minmax(0, 240px)); }
+}

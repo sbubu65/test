@@ -112,62 +112,9 @@
     return '<section class="card"><h2>' + esc(sec.title) + "</h2>" + sectionRenderers[sec.type](sec, data) + "</section>";
   }
 
-  /* ---------- tampilan Review (hanya baca) ---------- */
-  function badge(status) {
-    if (!status) return "-";
-    return '<span class="badge badge--' + STATUS_CLASS[status] + '">' + esc(status) + "</span>";
-  }
-
-  function reviewRow(label, valueHtml) {
-    return '<div class="review-row"><dt>' + esc(label) + "</dt><dd>" + valueHtml + "</dd></div>";
-  }
-
-  function reviewRows(sec, data) {
-    if (sec.type === "fields") {
-      return sec.fields.map(function (f) {
-        var v = String(getVal(data, sec.id + "." + f.id)).trim();
-        if (v && f.type === "date") v = AA.utils.formatDateID(v);
-        return reviewRow(f.label, v ? esc(v) : "-");
-      }).join("");
-    }
-
-    if (sec.type === "checklist") {
-      return sec.items.map(function (item) {
-        var base = sec.id + "." + item.id;
-        var status = getVal(data, base + ".status");
-        var note = String(getVal(data, base + ".note")).trim();
-        var noteHtml = status === NOTE_WHEN && note ? '<span class="review-note">' + esc(note) + "</span>" : "";
-        return reviewRow(item.label, badge(status) + noteHtml);
-      }).join("");
-    }
-
-    // license
-    return sec.items.map(function (item) {
-      var base = sec.id + "." + item.id;
-      var extra = String(getVal(data, base + ".extra")).trim();
-      var note = String(getVal(data, base + ".note")).trim();
-      var detail = "";
-      if (extra) detail += '<span class="review-note">' + esc(item.extraLabel) + ": " + esc(extra) + "</span>";
-      if (note) detail += '<span class="review-note">Catatan: ' + esc(note) + "</span>";
-      return reviewRow(item.label, badge(getVal(data, base + ".status")) + detail);
-    }).join("");
-  }
-
-  // Section dengan reviewGroup yang sama digabung dalam satu kartu (mis. Identitas + Spesifikasi laptop).
-  function reviewGroupsHtml(def, data) {
-    var groups = [];
-    var index = {};
-    def.steps.forEach(function (step) {
-      step.sections.forEach(function (sec) {
-        var title = sec.reviewGroup || sec.title;
-        if (!(title in index)) { index[title] = groups.length; groups.push({ title: title, html: "" }); }
-        groups[index[title]].html += reviewRows(sec, data);
-      });
-    });
-    return groups.map(function (g) {
-      return '<section class="card"><h2>' + esc(g.title) + '</h2><dl class="review-list">' + g.html + "</dl></section>";
-    }).join("");
-  }
+  /* ---------- tampilan Review (hanya baca): komponen bersama dengan halaman Detail ---------- */
+  var review = AA.components.auditReview;
+  var reviewRow = review.row;
 
   function scoringPreviewHtml(r) {
     var rows =
@@ -316,7 +263,7 @@
             ? '<div class="notice notice--error" role="alert">' + errorHtml(missingAll, true) +
               '<button type="button" class="btn btn--secondary" data-action="fix">Lengkapi Sekarang</button></div>'
             : "") +
-          reviewGroupsHtml(def, draft.data) +
+          review.groupsHtml(def, draft.data) +
           scoringPreviewHtml(result);
       } else {
         var step = def.steps[draft.step];

@@ -24,6 +24,7 @@ function makeEnv(opts = {}) {
   const ctx = {
     console, Logger: { log: m => (out.logs = out.logs || []).push(String(m)) },
     SpreadsheetApp: { getActiveSpreadsheet: () => ({ getSheetByName: () => sheet, insertSheet: () => sheet }), openById: () => null, flush() {} },
+    Utilities: { formatDate: (d, tz, f) => d.toISOString().slice(0, 10) }, Session: { getScriptTimeZone: () => 'Asia/Jakarta' },
     PropertiesService: { getScriptProperties: () => ({ getProperty: () => null }) },
     LockService: { getScriptLock: () => ({ tryLock: () => opts.lockFails ? false : true, releaseLock() {} }) },
     ContentService: { MimeType: { JSON: "application/json" }, createTextOutput: s => ({ content: s, mime: null, setMimeType(m) { this.mime = m; return this; }, getContent() { return this.content; } }) },
@@ -32,7 +33,8 @@ function makeEnv(opts = {}) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, "../apps-script/Code.gs"), "utf8"), ctx);
   out.post = body => { const r = ctx.doPost({ postData: { contents: typeof body === "string" ? body : JSON.stringify(body) } }); return { json: JSON.parse(r.getContent()), mime: r.mime }; };
   out.postRaw = e => { const r = ctx.doPost(e); return JSON.parse(r.getContent()); };
-  out.get = () => { const r = ctx.doGet({}); return { json: JSON.parse(r.getContent()), mime: r.mime }; };
+  out.get = (parameter = {}) => { const r = ctx.doGet({ parameter }); return { json: JSON.parse(r.getContent()), mime: r.mime }; };
+  out.ctx = ctx;
   out.HEADERS = vm.runInContext("HEADERS", ctx);
   return out;
 }
@@ -126,8 +128,36 @@ env = makeEnv({ lockFails: true });
 r = env.post(payload(rep("OK", 16)));
 check("Server sibuk (lock gagal) -> pesan sederhana, tidak crash", r.json.success === false && /sibuk/.test(r.json.message));
 
-// doGet
-check("doGet: API aktif (JSON)", (() => { const g = makeEnv().get(); return g.json.success === true && g.mime === "application/json"; })());
+// ===== V0.6: GET =====
+check("doGet tanpa parameter: ping (V0.5 tetap jalan)", (() => { const g = makeEnv().get(); return g.json.success === true && g.json.message === "Asset Audit API aktif" && g.mime === "application/json"; })());
+check("doGet action=ping", makeEnv().get({ action: "ping" }).json.version === "V0.6");
+check("doGet aksi tidak dikenal ditolak", makeEnv().get({ action: "hapus" }).json.success === false);
+
+env = makeEnv();
+const ids = ["AUD-20261001-AAA001", "AUD-20261002-AAA002", "AUD-20261003-AAA003", "AUD-20261004-AAA004", "AUD-20261005-AAA005"];
+ids.forEach((id, i) => env.post(payload([...rep("OK", 10 + i), ...rep("Tidak OK", 2), ...rep("N/A", 4 - i)], { auditId: id, assetId: "AST-00" + (i + 1), createdAt: `2026-10-0${i + 1}T03:00:00.000Z`, auditDate: `2026-10-0${i + 1}` })));
+let list = env.get({ action: "list" });
+check("Test 1: list mengembalikan 5 audit", list.json.success === true && Array.isArray(list.json.data) && list.json.data.length === 5 && list.mime === "application/json", String(list.json.data && list.json.data.length));
+check("List terbaru dulu (createdAt)", list.json.data.map(a => a.assetId).join() === "AST-005,AST-004,AST-003,AST-002,AST-001");
+const a1 = list.json.data[4];
+check("List: field & tipe benar (checklistResult objek, angka numerik)", typeof a1.checklistResult === "object" && a1.checklistResult.Body === "OK" && Object.keys(a1.checklistResult).length === 13 && typeof a1.score === "number" && typeof a1.okCount === "number" && a1.deviceType === "Laptop" && a1.auditDate === "2026-10-01" && a1.serialNumber === "00123" && a1.windowsStatus === "N/A", JSON.stringify([a1.score, a1.okCount, a1.condition]));
+check("List memuat 32 kolom", Object.keys(a1).length === 32);
+const one = env.get({ action: "get", auditId: "AUD-20261003-AAA003" });
+check("get berdasarkan auditId (bukan nomor baris)", one.json.success && one.json.data.assetId === "AST-003" && one.json.data.auditId === "AUD-20261003-AAA003");
+check("get: auditId tidak ada -> tidak ditemukan", (() => { const r = env.get({ action: "get", auditId: "AUD-20261003-NOPE99" }); return r.json.success === false && /tidak ditemukan/.test(r.json.message); })());
+check("get: auditId tidak valid ditolak", env.get({ action: "get", auditId: "3" }).json.success === false && env.get({ action: "get" }).json.success === false);
+check("POST V0.5 tetap jalan setelah ada GET (duplikat tetap ditolak)", (() => { const r = env.post(payload(rep("OK", 16), { auditId: ids[0] })); return r.json.success && r.json.duplicate === true && env.sheet.length === 6; })());
+
+env = makeEnv();
+check("list pada sheet kosong/belum ada -> [] dan tidak mengubah sheet", (() => { const r = env.get({ action: "list" }); return r.json.success && r.json.data.length === 0 && env.sheet.length === 0; })());
+env = makeEnv(); env.post(payload(rep("N/A", 16)));
+check("list: 'Belum dapat dinilai' tetap berupa teks", env.get({ action: "list" }).json.data[0].score === "Belum dapat dinilai");
+env = makeEnv(); env.post(payload(rep("OK", 16), { assetId: "=CMD", brand: "+x" }));
+check("list: awalan pengaman rumus dibuang saat dibaca", (() => { const d = env.get({ action: "list" }).json.data[0]; return d.assetId === "=CMD" && d.brand === "+x"; })());
+env = makeEnv(); env.post(payload(rep("OK", 16)));
+check("list: sel tanggal (Date) dinormalkan", (() => { env.sheet[1][4] = new Date(Date.UTC(2026, 9, 4)); return env.get({ action: "list" }).json.data[0].auditDate === "2026-10-04"; })());
+env = makeEnv({ rows: [["salah", "header"]] });
+check("list dengan header salah -> ditolak dengan pesan sederhana", (() => { const r = env.get({ action: "list" }); return r.json.success === false && /Struktur sheet/.test(r.json.message); })());
 
 console.log(failed ? `\n${failed} uji GAGAL` : "\nSemua uji Apps Script lulus");
 process.exit(failed ? 1 : 0);

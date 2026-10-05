@@ -129,6 +129,7 @@
 
   AA.scoring = {
     categories: CATEGORIES,
+    unratedLabel: UNRATED.label,
     calculate: calculate,
     evaluate: evaluate,
     listByStatus: listByStatus,
