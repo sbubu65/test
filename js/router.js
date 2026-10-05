@@ -26,21 +26,24 @@
     }).join("");
   }
 
-  function navigate() {
+  function navigate(keepScroll) {
     var route = parseHash();
     var page = AA.pages[route.id];
     renderNav(route.id);
     page.render(container, { param: route.param });
     document.title = page.title + " · " + AA.config.appName + " " + AA.config.version;
-    window.scrollTo(0, 0);
+    if (keepScroll !== true) window.scrollTo(0, 0);
   }
 
   AA.router = {
     start: function (containerEl, navEl) {
       container = containerEl;
       nav = navEl;
-      window.addEventListener("hashchange", navigate);
-      navigate();
-    }
+      window.addEventListener("hashchange", function () { navigate(false); });
+      navigate(false);
+    },
+
+    // Gambar ulang halaman yang sedang tampil tanpa menggeser posisi scroll
+    refresh: function () { navigate(true); }
   };
 })(window.AssetAudit);
