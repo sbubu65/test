@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0B7A66">
-  <title>Asset Audit V0.5</title>
+  <title>Asset Audit V0.6</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -17,7 +17,7 @@
     <div class="app-header__inner">
       <div class="brand">
         <span class="brand__name" id="app-name">Asset Audit</span>
-        <span class="brand__version" id="app-version">V0.5</span>
+        <span class="brand__version" id="app-version">V0.6</span>
       </div>
       <nav class="nav" id="main-nav" aria-label="Menu utama"></nav>
     </div>
@@ -27,6 +27,7 @@
 
   <!-- Urutan script penting: namespace -> data -> utils -> components -> definisi audit -> pages -> router -> app -->
   <script src="js/config.js"></script>
+  <script src="js/version.js"></script>
   <script src="js/data/dummy-data.js"></script>
   <script src="js/utils/dom.js"></script>
   <script src="js/utils/date.js"></script>
@@ -35,10 +36,12 @@
   <script src="js/data/audit-draft.js"></script>
   <script src="js/data/audit-api.js"></script>
   <script src="js/data/audit-sync.js"></script>
+  <script src="js/data/audit-history.js"></script>
   <script src="js/components/icons.js"></script>
   <script src="js/components/stat-card.js"></script>
   <script src="js/components/data-table.js"></script>
   <script src="js/components/score-card.js"></script>
+  <script src="js/components/audit-review.js"></script>
   <script src="js/components/audit-result.js"></script>
   <script src="js/components/audit-wizard.js"></script>
   <script src="js/audit-defs/common.js"></script>
