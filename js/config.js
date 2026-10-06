@@ -18,7 +18,7 @@ window.AssetAudit = {
     // JANGAN menaruh API key / password di sini: file ini bisa dibaca siapa pun yang membuka web.
     // ============================================================================================
     api: {
-      API_URL: "PASTE_GOOGLE_APPS_SCRIPT_URL_DI_SINI",
+      API_URL: "https://script.google.com/macros/s/AKfycbyXaf04tKSXxVC3pHwNz3lvwSqI97fZcpzBy4Vdo-Gi3pqNG5ygmvKXtpmEvH9ijN6-/exec",
       timeoutMs: 20000   // batas waktu menunggu respons (milidetik)
     },
 
