@@ -1,5 +1,5 @@
 /* Tampilan data audit hanya-baca, dibentuk dari definisi audit (js/audit-defs/*.js).
-   Dipakai oleh halaman Review (sebelum submit) dan Detail Hasil Audit (dari Riwayat).
+   Dipakai oleh halaman Review (sebelum submit) dan Detail Audit (dari Riwayat).
    groupsHtml(def, data, { skipSections: ["info"] }) -> kartu per grup (Spesifikasi, Checklist, Lisensi, ...). */
 (function (AA) {
   var esc = AA.utils.escapeHtml;
@@ -25,6 +25,15 @@
     return '<div class="review-row"><dt>' + esc(label) + "</dt><dd>" + valueHtml + "</dd></div>";
   }
 
+  // "always": catatan selalu ditampilkan; "onFail": hanya jika status Tidak OK
+  function alwaysNote(sec) {
+    return (sec.noteMode || (sec.type === "license" ? "always" : "onFail")) === "always";
+  }
+
+  function detailLine(text) {
+    return '<span class="review-note">' + esc(text) + "</span>";
+  }
+
   function rowsFor(sec, data) {
     if (sec.type === "fields") {
       return sec.fields.map(function (f) {
@@ -34,29 +43,32 @@
       }).join("");
     }
 
-    if (sec.type === "checklist") {
-      return sec.items.map(function (item) {
-        var base = sec.id + "." + item.id;
-        var status = getVal(data, base + ".status");
-        var note = String(getVal(data, base + ".note")).trim();
-        var noteHtml = status === NOTE_WHEN && note ? '<span class="review-note">' + esc(note) + "</span>" : "";
-        return row(item.label, badge(status) + noteHtml);
+    if (sec.type === "apps") {
+      var apps = Array.isArray(data && data[sec.id]) ? data[sec.id] : [];
+      if (apps.length === 0) return row(sec.title, "-");
+      return apps.map(function (a, i) {
+        var detail = "";
+        if (String(a.version || "").trim()) detail += detailLine("Versi: " + String(a.version).trim());
+        if (String(a.note || "").trim()) detail += detailLine("Catatan: " + String(a.note).trim());
+        return row(String(a.name || "").trim() || "Aplikasi " + (i + 1), badge(a.status) + detail);
       }).join("");
     }
 
-    // license
+    // checklist & license: status + isian tambahan (jika ada) + catatan
+    var always = alwaysNote(sec);
     return sec.items.map(function (item) {
       var base = sec.id + "." + item.id;
+      var status = getVal(data, base + ".status");
       var extra = String(getVal(data, base + ".extra")).trim();
       var note = String(getVal(data, base + ".note")).trim();
       var detail = "";
-      if (extra) detail += '<span class="review-note">' + esc(item.extraLabel) + ": " + esc(extra) + "</span>";
-      if (note) detail += '<span class="review-note">Catatan: ' + esc(note) + "</span>";
-      return row(item.label, badge(getVal(data, base + ".status")) + detail);
+      if (extra) detail += detailLine((item.extraLabel || "Detail") + ": " + extra);
+      if (note && (always || status === NOTE_WHEN)) detail += detailLine(always ? "Catatan: " + note : note);
+      return row(item.label, badge(status) + detail);
     }).join("");
   }
 
-  // Section dengan reviewGroup yang sama digabung dalam satu kartu (mis. Identitas + Spesifikasi laptop).
+  // Section dengan reviewGroup yang sama digabung dalam satu kartu (mis. Identitas + Spesifikasi).
   function groupsHtml(def, data, opts) {
     var skip = (opts && opts.skipSections) || [];
     var groups = [];
