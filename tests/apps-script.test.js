@@ -8,10 +8,14 @@ const vm = require("vm");
 function makeEnv(opts = {}) {
   const rows = []; // rows[0] = header
   const formats = [];
+  const out = { sheet: rows, formats, maxCols: opts.maxCols || 26 };
   const sheet = {
     getLastRow: () => rows.length,
+    getMaxColumns: () => out.maxCols,
+    insertColumnsAfter(after, n) { out.maxCols += n; },
     setFrozenRows() {},
     getRange(r, c, nr, nc) {
+      if (c - 1 + nc > out.maxCols) throw new Error("The coordinates of the range are outside the dimensions of the sheet.");
       return {
         getValues: () => Array.from({ length: nr }, (_, i) => Array.from({ length: nc }, (_, j) => (rows[r - 1 + i] || [])[c - 1 + j] ?? "")),
         setValues: v => { v.forEach((line, i) => { rows[r - 1 + i] = line.slice(); }); },
@@ -20,7 +24,6 @@ function makeEnv(opts = {}) {
     },
   };
   if (opts.rows) opts.rows.forEach(r => rows.push(r));
-  const out = { sheet: rows, formats };
   const ctx = {
     console, Logger: { log: m => (out.logs = out.logs || []).push(String(m)) },
     SpreadsheetApp: { getActiveSpreadsheet: () => ({ getSheetByName: () => sheet, insertSheet: () => sheet }), openById: () => null, flush() {} },
@@ -62,7 +65,7 @@ let r = env.post(payload([...rep("OK", 10), ...rep("N/A", 6)]));
 let row = rowOf(env, 1);
 check("Test 1: berhasil, 100 / Baik / data masuk", r.json.success === true && r.json.message === "Audit berhasil disimpan" && r.json.auditId === "AUD-20261004-ABC123" && env.sheet.length === 2 && row.score === 100 && row.condition === "Baik" && row.okCount === 10 && row.notOkCount === 0 && row.naCount === 6 && row.itemsCounted === 10 && row.totalItems === 16, JSON.stringify([row.score, row.condition, row.totalItems, row.okCount, row.notOkCount, row.naCount, row.itemsCounted]));
 check("Respons berformat JSON (Content-Type application/json)", r.mime === "application/json");
-check("Header ditulis otomatis (32 kolom, urutan sesuai spesifikasi)", env.sheet[0].length === 32 && env.sheet[0][0] === "auditId" && env.sheet[0][31] === "createdAt" && env.sheet[0][28] === "score");
+check("Header ditulis otomatis (41 kolom: 32 kolom V0.5 + 9 kolom V0.7)", env.sheet[0].length === 41 && env.sheet[0][0] === "auditId" && env.sheet[0][31] === "createdAt" && env.sheet[0][28] === "score" && env.sheet[0][32] === "imei1" && env.sheet[0][40] === "checklistValues");
 check("checklistResult tersimpan sebagai JSON string label -> status", JSON.parse(row.checklistResult).Body === "OK" && JSON.parse(row.checklistResult)["Port USB"] === "OK" && Object.keys(JSON.parse(row.checklistResult)).length === 13);
 check("Kolom teks diformat plain text (serial 00123 tetap teks)", env.formats[1][env.HEADERS.indexOf("serialNumber")] === "@" && row.serialNumber === "00123");
 
@@ -117,7 +120,7 @@ env = makeEnv();
 env.post(payload(rep("OK", 16), { assetId: "=HYPERLINK(\"http://x\")", brand: "+cmd", windowsNote: "@SUM(1)", unknownField: "x" }));
 row = rowOf(env, 1);
 check("Teks diawali = + @ dinetralkan agar bukan rumus", row.assetId.startsWith("'=") && row.brand.startsWith("'+") && row.windowsNote.startsWith("'@"));
-check("Field tak dikenal tidak ikut disimpan", env.sheet[1].length === 32 && !env.sheet[1].includes("x"));
+check("Field tak dikenal tidak ikut disimpan", env.sheet[1].length === 41 && !env.sheet[1].includes("x"));
 env = makeEnv(); env.post(payload(rep("OK", 16), { brand: "x".repeat(500) })); check("Panjang field dibatasi", rowOf(env, 1).brand.length === 100);
 
 // Struktur sheet
@@ -130,7 +133,7 @@ check("Server sibuk (lock gagal) -> pesan sederhana, tidak crash", r.json.succes
 
 // ===== V0.6: GET =====
 check("doGet tanpa parameter: ping (V0.5 tetap jalan)", (() => { const g = makeEnv().get(); return g.json.success === true && g.json.message === "Asset Audit API aktif" && g.mime === "application/json"; })());
-check("doGet action=ping", makeEnv().get({ action: "ping" }).json.version === "V0.6");
+check("doGet action=ping", makeEnv().get({ action: "ping" }).json.version === "V0.7");
 check("doGet aksi tidak dikenal ditolak", makeEnv().get({ action: "hapus" }).json.success === false);
 
 env = makeEnv();
@@ -141,7 +144,7 @@ check("Test 1: list mengembalikan 5 audit", list.json.success === true && Array.
 check("List terbaru dulu (createdAt)", list.json.data.map(a => a.assetId).join() === "AST-005,AST-004,AST-003,AST-002,AST-001");
 const a1 = list.json.data[4];
 check("List: field & tipe benar (checklistResult objek, angka numerik)", typeof a1.checklistResult === "object" && a1.checklistResult.Body === "OK" && Object.keys(a1.checklistResult).length === 13 && typeof a1.score === "number" && typeof a1.okCount === "number" && a1.deviceType === "Laptop" && a1.auditDate === "2026-10-01" && a1.serialNumber === "00123" && a1.windowsStatus === "N/A", JSON.stringify([a1.score, a1.okCount, a1.condition]));
-check("List memuat 32 kolom", Object.keys(a1).length === 32);
+check("List memuat 41 kolom", Object.keys(a1).length === 41);
 const one = env.get({ action: "get", auditId: "AUD-20261003-AAA003" });
 check("get berdasarkan auditId (bukan nomor baris)", one.json.success && one.json.data.assetId === "AST-003" && one.json.data.auditId === "AUD-20261003-AAA003");
 check("get: auditId tidak ada -> tidak ditemukan", (() => { const r = env.get({ action: "get", auditId: "AUD-20261003-NOPE99" }); return r.json.success === false && /tidak ditemukan/.test(r.json.message); })());
@@ -158,6 +161,94 @@ env = makeEnv(); env.post(payload(rep("OK", 16)));
 check("list: sel tanggal (Date) dinormalkan", (() => { env.sheet[1][4] = new Date(Date.UTC(2026, 9, 4)); return env.get({ action: "list" }).json.data[0].auditDate === "2026-10-04"; })());
 env = makeEnv({ rows: [["salah", "header"]] });
 check("list dengan header salah -> ditolak dengan pesan sederhana", (() => { const r = env.get({ action: "list" }); return r.json.success === false && /Struktur sheet/.test(r.json.message); })());
+
+
+/* ================= V0.7: Smartphone + migrasi sheet lama ================= */
+const PHONE_KEYS = ["Body / Casing","Back Cover","Frame","Layar","Touchscreen","Brightness","Dead Pixel","Kamera Belakang","Kamera Depan","Flash","Speaker","Microphone","Earpiece","Wi-Fi","Bluetooth","Cellular Network","GPS","NFC","USB Port","Charging","Wireless Charging","Battery Health","Battery Charging","Battery Condition","SIM Slot 1","SIM Slot 2","SIM Detection","Mobile Data","Fingerprint","Face Unlock","Operating System","OS Version","Security Update","Device Security","Google / Apple Account"]; // 35 item
+function phone(statuses, extra = {}) {
+  const checklistResult = {}; PHONE_KEYS.forEach((k, i) => { checklistResult[k] = statuses[i]; });
+  return Object.assign({
+    auditId: "AUD-20261005-PHONE1", assetId: "HP-001", deviceType: "Smartphone", auditor: "Budi", auditDate: "2026-10-05",
+    brand: "Samsung", model: "A54", serialNumber: "R5CW30ABCDE", imei1: "352099001761481", imei2: "352099001761499",
+    operatingSystem: "Android", osVersion: "14", processor: "Exynos 1380", ram: "8 GB", storage: "256 GB", batteryCapacity: "5000 mAh", color: "Hitam",
+    batteryHealth: "87%", checklistResult, checklistNotes: { "Frame": "Lecet kecil", "Battery Health": "Turun" }, checklistValues: { "Security Update": "1 September 2026" },
+    requiredApps: [{ name: "MDM Agent", status: "OK", version: "3.2", note: "" }, { name: "Email Kantor", status: "Tidak OK", version: "", note: "Belum login" }],
+    createdAt: "2026-10-05T03:00:00.000Z",
+  }, extra);
+}
+const P = (ok_, bad_) => [...rep("OK", ok_), ...rep("Tidak OK", bad_), ...rep("N/A", 35 - ok_ - bad_)];
+
+env = makeEnv();
+r = env.post(phone(P(35, 0)));
+row = rowOf(env, 1);
+check("Smartphone: tersimpan dengan deviceType = Smartphone", r.json.success === true && row.deviceType === "Smartphone" && row.imei1 === "352099001761481" && row.osVersion === "14" && row.batteryHealth === "87%" && row.color === "Hitam", r.json.message);
+check("Smartphone: 35 item + 2 aplikasi dinilai (36 OK, 1 Tidak OK)", row.totalItems === 37 && row.okCount === 36 && row.notOkCount === 1 && row.itemsCounted === 37, JSON.stringify([row.totalItems, row.okCount, row.notOkCount, row.naCount]));
+check("Smartphone: kolom lisensi laptop kosong", row.windowsStatus === "" && row.officeStatus === "" && row.antivirusStatus === "" && row.gpu === "");
+check("Smartphone: catatan, isian tambahan, aplikasi tersimpan sebagai JSON", JSON.parse(row.checklistNotes).Frame === "Lecet kecil" && JSON.parse(row.checklistValues)["Security Update"] === "1 September 2026" && JSON.parse(row.requiredApps)[1].name === "Email Kantor" && Object.keys(JSON.parse(row.checklistResult)).length === 35);
+
+// Acceptance Smartphone (hitungan item): tanpa aplikasi agar angkanya persis
+const sp = (st, extra) => { const e = makeEnv(); const res = e.post(phone(st, Object.assign({ requiredApps: [] }, extra))); return { res, row: e.sheet.length > 1 ? rowOf(e, 1) : null, e }; };
+let t = sp(P(35, 0));
+check("Smartphone Test 1: semua OK -> 100 / Baik", t.row.score === 100 && t.row.condition === "Baik");
+t = sp(P(10, 2));
+check("Smartphone Test 2: 10 OK, 2 Tidak OK, sisanya N/A -> 83.33 / Baik", t.row.score === 83.33 && t.row.condition === "Baik" && t.row.naCount === 23 && t.row.itemsCounted === 12);
+t = sp(rep("N/A", 35));
+check("Smartphone Test 3: semua N/A -> Belum dapat dinilai", t.res.json.success && t.row.score === "Belum dapat dinilai" && t.row.condition === "Belum dapat dinilai");
+const nfcIdx = PHONE_KEYS.indexOf("NFC"), sim2Idx = PHONE_KEYS.indexOf("SIM Slot 2"), fpIdx = PHONE_KEYS.indexOf("Fingerprint");
+[["NFC", nfcIdx], ["SIM Slot 2", sim2Idx], ["Fingerprint", fpIdx]].forEach(([nm, idx]) => {
+  const st = rep("OK", 35); st[idx] = "N/A";
+  const x = sp(st);
+  check(`Smartphone: ${nm} = N/A tidak mengurangi nilai (100 / Baik)`, x.row.score === 100 && x.row.condition === "Baik" && x.row.naCount === 1 && x.row.itemsCounted === 34);
+});
+
+// Validasi khusus smartphone
+const badPhone = (name, extra, expect) => { const e = makeEnv(); const res = e.post(phone(P(35, 0), extra)); check(name, res.json.success === false && e.sheet.length <= 1 && res.json.message.includes(expect), res.json.message); };
+badPhone("Smartphone: IMEI 1 kosong ditolak", { imei1: "" }, "IMEI 1");
+badPhone("Smartphone: IMEI 1 bukan 15 digit ditolak", { imei1: "12345" }, "IMEI 1");
+badPhone("Smartphone: IMEI 2 salah format ditolak", { imei2: "abc" }, "IMEI 2");
+badPhone("Smartphone: IMEI 2 sama dengan IMEI 1 ditolak", { imei2: "352099001761481" }, "tidak boleh sama");
+badPhone("Smartphone: Serial Number kosong ditolak", { serialNumber: "" }, "Serial");
+badPhone("Smartphone: status aplikasi tidak valid ditolak", { requiredApps: [{ name: "X", status: "Mungkin" }] }, "Status");
+badPhone("Smartphone: nama aplikasi kosong ditolak", { requiredApps: [{ name: "", status: "OK" }] }, "Nama aplikasi");
+badPhone("Smartphone: lebih dari 10 aplikasi ditolak", { requiredApps: Array.from({ length: 11 }, (_, i) => ({ name: "A" + i, status: "OK" })) }, "aplikasi");
+t = sp(P(35, 0), { imei2: "" }); check("Smartphone: IMEI 2 boleh kosong (single SIM)", t.res.json.success === true && t.row.imei2 === "");
+t = sp(P(35, 0), { imei1: "=1+1" }); check("IMEI berisi rumus ditolak (bukan 15 digit)", t.res.json.success === false);
+
+// Laptop tidak terganggu: field smartphone diabaikan, lisensi tetap wajib
+env = makeEnv();
+env.post(payload(rep("OK", 16), { imei1: "352099001761481", requiredApps: [{ name: "X", status: "Tidak OK" }], checklistNotes: { Body: "baret" } }));
+row = rowOf(env, 1);
+check("Laptop: field smartphone diabaikan & tidak ikut dinilai", row.imei1 === "" && row.requiredApps === "" && row.totalItems === 16 && row.okCount === 16 && row.score === 100);
+check("Laptop: catatan item (checklistNotes) kini tersimpan", JSON.parse(row.checklistNotes).Body === "baret");
+bad("Laptop: lisensi tetap wajib", payload(rep("OK", 16), { windowsStatus: "" }), "Windows");
+
+// List & detail memuat Smartphone dan Laptop berdampingan
+env = makeEnv();
+env.post(payload(rep("OK", 16)));
+env.post(phone(P(30, 5)));
+const lst = env.get({ action: "list" }).json.data;
+check("List: Laptop dan Smartphone berdampingan", lst.length === 2 && lst.map(a => a.deviceType).sort().join() === "Laptop,Smartphone");
+const phoneOne = env.get({ action: "get", auditId: "AUD-20261005-PHONE1" }).json.data;
+check("Detail Smartphone via auditId: JSON dikembalikan sebagai objek/array", phoneOne.deviceType === "Smartphone" && phoneOne.checklistResult["Frame"] === "OK" && phoneOne.checklistNotes.Frame === "Lecet kecil" && Array.isArray(phoneOne.requiredApps) && phoneOne.requiredApps.length === 2 && phoneOne.imei1 === "352099001761481");
+
+// Migrasi: sheet lama V0.5/V0.6 (32 kolom) berisi audit Laptop
+const legacyHeader = env.HEADERS.slice(0, 32);
+const legacyRow = new Array(32).fill("");
+legacyRow[0] = "AUD-20261001-OLD001"; legacyRow[1] = "AST-OLD"; legacyRow[2] = "Laptop"; legacyRow[3] = "Lama"; legacyRow[4] = "2026-10-01";
+legacyRow[13] = JSON.stringify({ Body: "OK" }); legacyRow[14] = "OK"; legacyRow[17] = "OK"; legacyRow[20] = "OK";
+legacyRow[23] = 4; legacyRow[24] = 4; legacyRow[25] = 0; legacyRow[26] = 0; legacyRow[27] = 4; legacyRow[28] = 100; legacyRow[29] = "Baik"; legacyRow[30] = "Selesai"; legacyRow[31] = "2026-10-01T03:00:00.000Z";
+env = makeEnv({ rows: [legacyHeader, legacyRow], maxCols: 32 });
+const legacyList = env.get({ action: "list" });
+check("Migrasi: sheet lama 32 kolom tetap bisa dibaca (list)", legacyList.json.success === true && legacyList.json.data.length === 1 && legacyList.json.data[0].assetId === "AST-OLD" && legacyList.json.data[0].requiredApps.length === 0 && legacyList.json.data[0].imei1 === "", legacyList.json.message);
+const legacyGet = env.get({ action: "get", auditId: "AUD-20261001-OLD001" });
+check("Migrasi: detail audit lama tetap bisa dibaca", legacyGet.json.success === true && legacyGet.json.data.checklistResult.Body === "OK");
+r = env.post(phone(P(35, 0)));
+check("Migrasi: POST pertama menambah 9 kolom header di kanan, data lama utuh", r.json.success === true && env.sheet[0].length === 41 && env.sheet[0][32] === "imei1" && env.sheet[0][40] === "checklistValues" && env.sheet[1][1] === "AST-OLD" && env.sheet[1][28] === 100 && env.sheet.length === 3, r.json.message);
+check("Migrasi: baris baru Smartphone benar di sheet yang sudah dimigrasi", rowOf(env, 2).deviceType === "Smartphone" && rowOf(env, 2).imei1 === "352099001761481");
+env = makeEnv({ rows: [legacyHeader.slice(0, 31).concat(["salah"]), legacyRow], maxCols: 32 });
+check("Migrasi: header lama yang tidak cocok tetap ditolak", env.post(phone(P(35, 0))).json.success === false);
+env = makeEnv({ rows: [legacyHeader.concat(["imei1"]), legacyRow.concat([""])], maxCols: 33 });
+check("Migrasi: sheet yang separuh dimigrasi (33 kolom) dilengkapi", env.post(phone(P(35, 0))).json.success === true && env.sheet[0].length === 41);
 
 console.log(failed ? `\n${failed} uji GAGAL` : "\nSemua uji Apps Script lulus");
 process.exit(failed ? 1 : 0);

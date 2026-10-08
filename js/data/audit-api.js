@@ -13,25 +13,6 @@
   var MSG_LIST_FAIL = "Gagal mengambil data terbaru. Menampilkan data lokal.";
   var MSG_LIST_NOT_CONFIGURED = "Koneksi ke Spreadsheet belum diatur. Menampilkan data lokal.";
 
-  // Kolom lisensi di Spreadsheet <- field di form (id item lisensi: windows | office | antivirus)
-  var LICENSE_COLUMNS = {
-    windows:   { status: "windowsStatus",   extra: "windowsVersion", note: "windowsNote" },
-    office:    { status: "officeStatus",    extra: "officeVersion",  note: "officeNote" },
-    antivirus: { status: "antivirusStatus", extra: "antivirusName",  note: "antivirusNote" }
-  };
-
-  // Kolom spesifikasi di Spreadsheet -> [id section, id field] di definisi audit laptop
-  var SPEC_COLUMNS = {
-    brand:           ["laptop", "brand"],
-    model:           ["laptop", "model"],
-    serialNumber:    ["laptop", "serial"],
-    processor:       ["spec", "processor"],
-    ram:             ["spec", "ram"],
-    storage:         ["spec", "storage"],
-    operatingSystem: ["spec", "os"],
-    gpu:             ["spec", "gpu"]
-  };
-
   function cfg() { return AA.config.api || {}; }
 
   function isConfigured() {
@@ -54,14 +35,30 @@
     return "AUD-" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + "-" + rand;
   }
 
+  function str(v) { return v === null || v === undefined ? "" : String(v); }
+  function trim(v) { return str(v).trim(); }
+  function num(v) { var n = Number(v); return isFinite(n) ? n : 0; }
+
+  // Kunci item di checklistResult (JSON). Default = label; item.key dipakai jika label ganda dalam satu perangkat.
+  function sheetKey(item) { return item.key || item.label; }
+
+  function alwaysNote(sec) {
+    return (sec.noteMode || (sec.type === "license" ? "always" : "onFail")) === "always";
+  }
+
   /* Ubah record tersimpan menjadi data kiriman (nama field = nama kolom Spreadsheet).
-     Nilai/kondisi sengaja TIDAK dikirim: Apps Script menghitungnya sendiri dari checklist. */
+     Dibentuk dari definisi audit perangkat itu, jadi Laptop dan Smartphone memakai kode yang sama:
+       field.sheet                  -> kolom khusus (brand, serialNumber, imei1, ...)
+       item.sheet                   -> kolom status/versi/catatan khusus (lisensi laptop)
+       item lain                    -> checklistResult[kunci] = status
+       catatan item                 -> checklistNotes[kunci]   (Tidak OK, atau selalu untuk section noteMode "always")
+       isian tambahan item          -> kolom item.extraSheet, atau checklistValues[kunci]
+       section "apps"               -> requiredApps [ { name, status, version, note } ]
+     Nilai/kondisi sengaja TIDAK dikirim: Apps Script menghitungnya sendiri dari status. */
   function buildPayload(rec) {
     var def = AA.auditDefs[rec.deviceType];
     var data = rec.data || {};
     var b = AA.storage.basics(rec);
-    var spec = {};
-    [data.laptop, data.spec].forEach(function (part) { for (var k in (part || {})) spec[k] = part[k]; });
 
     var payload = {
       auditId: rec.auditId,
@@ -69,43 +66,69 @@
       deviceType: rec.deviceLabel,
       auditor: b.auditor,
       auditDate: b.tanggal,
-      brand: spec.brand || "",
-      model: spec.model || "",
-      serialNumber: spec.serial || "",
-      processor: spec.processor || "",
-      ram: spec.ram || "",
-      storage: spec.storage || "",
-      operatingSystem: spec.os || "",
-      gpu: spec.gpu || "",
       createdAt: b.createdAt
     };
+    var results = {}, notes = {}, values = {}, apps = [];
 
-    var checklistResult = {};
     (def ? def.steps : []).forEach(function (step) {
       step.sections.forEach(function (sec) {
-        (sec.items || []).forEach(function (item) {
-          var entry = data[sec.id] && data[sec.id][item.id];
-          if (sec.role === "checklist") checklistResult[item.label] = entry && entry.status || "";
-          if (sec.role === "license" && LICENSE_COLUMNS[item.id]) {
-            var cols = LICENSE_COLUMNS[item.id];
-            payload[cols.status] = entry && entry.status || "";
-            payload[cols.extra] = entry && entry.extra || "";
-            payload[cols.note] = entry && entry.note || "";
-          }
-        });
+        var secData = data[sec.id];
+
+        if (sec.type === "fields") {
+          sec.fields.forEach(function (f) {
+            if (f.sheet) payload[f.sheet] = trim(secData && secData[f.id]);
+          });
+        } else if (sec.type === "apps") {
+          (Array.isArray(secData) ? secData : []).forEach(function (row) {
+            apps.push({ name: trim(row.name), status: str(row.status), version: trim(row.version), note: trim(row.note) });
+          });
+        } else if (sec.items) {
+          var always = alwaysNote(sec);
+          sec.items.forEach(function (item) {
+            var entry = (secData && secData[item.id]) || {};
+            var status = str(entry.status);
+            var extra = trim(entry.extra);
+            var note = trim(entry.note);
+
+            if (item.sheet) { // kolom khusus (lisensi laptop)
+              payload[item.sheet.status] = status;
+              payload[item.sheet.extra] = extra;
+              payload[item.sheet.note] = note;
+              return;
+            }
+            var key = sheetKey(item);
+            results[key] = status;
+            if (note && (always || status === "Tidak OK")) notes[key] = note;
+            if (extra) {
+              if (item.extraSheet) payload[item.extraSheet] = extra;
+              else values[key] = extra;
+            }
+          });
+        }
       });
     });
-    payload.checklistResult = checklistResult;
+
+    payload.checklistResult = results;
+    payload.checklistNotes = notes;
+    payload.checklistValues = values;
+    payload.requiredApps = apps;
     return payload;
+  }
+
+  // Kolom JSON dari Spreadsheet bisa berupa objek/array (dari ?action=list) atau teks JSON
+  function asObject(v) {
+    if (typeof v === "string") { try { v = JSON.parse(v); } catch (e) { return {}; } }
+    return v && typeof v === "object" && !Array.isArray(v) ? v : {};
+  }
+  function asArray(v) {
+    if (typeof v === "string") { try { v = JSON.parse(v); } catch (e) { return []; } }
+    return Array.isArray(v) ? v : [];
   }
 
   /* Kebalikan buildPayload: satu baris Spreadsheet (hasil ?action=list/get) -> record seperti yang
      disimpan lokal, supaya halaman Hasil/Detail Audit bisa memakainya tanpa perubahan.
      Data dari Spreadsheet diperlakukan tidak tepercaya: semua nilai dijadikan teks/angka dulu.
-     Catatan checklist (kolom tidak ada di Spreadsheet) tidak tersedia untuk audit dari Spreadsheet. */
-  function str(v) { return v === null || v === undefined ? "" : String(v); }
-  function num(v) { var n = Number(v); return isFinite(n) ? n : 0; }
-
+     Baris lama (V0.5/V0.6) tanpa kolom catatan tetap terbaca; catatannya kosong. */
   function rowToRecord(row) {
     var label = str(row.deviceType);
     var typeCfg = AA.config.deviceTypes.filter(function (d) { return d.label === label; })[0];
@@ -113,24 +136,34 @@
     var def = AA.auditDefs[typeId];
 
     var data = { info: { assetId: str(row.assetId), auditor: str(row.auditor), tanggal: str(row.auditDate) } };
-    Object.keys(SPEC_COLUMNS).forEach(function (col) {
-      var target = SPEC_COLUMNS[col];
-      if (!data[target[0]]) data[target[0]] = {};
-      data[target[0]][target[1]] = str(row[col]);
-    });
+    var results = asObject(row.checklistResult), notes = asObject(row.checklistNotes), values = asObject(row.checklistValues);
+    var apps = asArray(row.requiredApps);
 
-    var checklist = row.checklistResult && typeof row.checklistResult === "object" ? row.checklistResult : {};
     (def ? def.steps : []).forEach(function (step) {
       step.sections.forEach(function (sec) {
-        if (sec.role === "checklist") {
+        if (sec.id === "info") return;
+
+        if (sec.type === "fields") {
           data[sec.id] = {};
-          sec.items.forEach(function (item) { data[sec.id][item.id] = { status: str(checklist[item.label]), note: "" }; });
-        }
-        if (sec.role === "license") {
+          sec.fields.forEach(function (f) { data[sec.id][f.id] = f.sheet ? str(row[f.sheet]) : ""; });
+        } else if (sec.type === "apps") {
+          data[sec.id] = apps.map(function (a) {
+            a = a || {};
+            return { name: str(a.name), status: str(a.status), version: str(a.version), note: str(a.note) };
+          });
+        } else if (sec.items) {
           data[sec.id] = {};
           sec.items.forEach(function (item) {
-            var cols = LICENSE_COLUMNS[item.id];
-            if (cols) data[sec.id][item.id] = { status: str(row[cols.status]), extra: str(row[cols.extra]), note: str(row[cols.note]) };
+            if (item.sheet) {
+              data[sec.id][item.id] = { status: str(row[item.sheet.status]), extra: str(row[item.sheet.extra]), note: str(row[item.sheet.note]) };
+            } else {
+              var key = sheetKey(item);
+              data[sec.id][item.id] = {
+                status: str(results[key]),
+                extra: item.extraSheet ? str(row[item.extraSheet]) : str(values[key]),
+                note: str(notes[key])
+              };
+            }
           });
         }
       });

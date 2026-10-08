@@ -1,16 +1,18 @@
-/* Wizard audit yang bisa dipakai semua jenis perangkat.
+/* Wizard audit yang bisa dipakai semua jenis perangkat (Laptop, Smartphone, ...).
    Pemakaian: AssetAudit.components.auditWizard(container, AssetAudit.auditDefs.laptop)
 
    Alur: tiap "step" di definisi -> satu layar isian, lalu satu layar Review -> Submit.
    Data draft disimpan di AA.draft dengan bentuk:
      fields    -> data[section.id][field.id] = "teks"
-     checklist -> data[section.id][item.id] = { status, note }
+     checklist -> data[section.id][item.id] = { status, extra?, note }
      license   -> data[section.id][item.id] = { status, extra, note }
+     apps      -> data[section.id] = [ { name, status, version, note }, ... ]
    Semua angka nilai berasal dari AssetAudit.scoring (satu rumus untuk seluruh aplikasi). */
 (function (AA) {
   var esc = AA.utils.escapeHtml;
   var STATUS_CLASS = { "OK": "ok", "Tidak OK": "bad", "N/A": "na" };
   var NOTE_WHEN = "Tidak OK";
+  var DEFAULT_MAX_APPS = 10;
 
   /* ---------- akses data bertingkat: "fisik.body.status" ---------- */
   function getVal(data, path) {
@@ -42,6 +44,7 @@
       ? '<textarea class="field__input" id="' + id + '" rows="2" data-path="' + path + '">' + esc(value) + "</textarea>"
       : '<input class="field__input" id="' + id + '" type="' + (opts.type || "text") + '" data-path="' + path + '"' +
         ' value="' + esc(value) + '" placeholder="' + esc(opts.placeholder || "") + '" autocomplete="off"' +
+        (opts.inputMode ? ' inputmode="' + esc(opts.inputMode) + '"' : "") +
         (opts.required ? ' aria-required="true"' : "") + ">";
     return (
       '<div class="field" data-field-path="' + path + '">' +
@@ -69,47 +72,78 @@
     return '<div class="fields">' + sec.fields.map(function (f) {
       var path = sec.id + "." + f.id;
       return inputHtml(path, f.label, {
-        value: getVal(data, path), type: f.type, placeholder: f.placeholder, required: f.required
+        value: getVal(data, path), type: f.type, placeholder: f.placeholder,
+        required: f.required, inputMode: f.inputMode
       });
     }).join("") + "</div>";
   }
 
-  function checklistSection(sec, data) {
+  // "always": catatan selalu tampil (license); "onFail": catatan hanya muncul saat status Tidak OK (checklist)
+  function alwaysNote(sec) {
+    return (sec.noteMode || (sec.type === "license" ? "always" : "onFail")) === "always";
+  }
+
+  // checklist & license: status + isian tambahan (jika item.extraLabel ada) + catatan
+  function itemsSection(sec, data) {
+    var always = alwaysNote(sec);
     return '<div class="audit-list">' + sec.items.map(function (item) {
       var base = sec.id + "." + item.id;
       var status = getVal(data, base + ".status");
+      var extra = item.extraLabel
+        ? '<div class="audit-item__extra">' +
+            inputHtml(base + ".extra", item.extraLabel, { value: getVal(data, base + ".extra"), placeholder: item.extraPlaceholder }) +
+          "</div>"
+        : "";
+      var note = inputHtml(base + ".note", "Catatan", { value: getVal(data, base + ".note"), multiline: true });
+      var noteBox = always
+        ? '<div class="audit-item__extra">' + note + "</div>"
+        : '<div class="audit-item__extra" data-note-when="' + NOTE_WHEN + '"' + (status === NOTE_WHEN ? "" : " hidden") + ">" + note + "</div>";
       return (
         '<div class="audit-item" data-item-path="' + base + '">' +
           '<p class="audit-item__label">' + esc(item.label) + "</p>" +
           statusHtml(base + ".status", status, item.label) +
-          '<div class="audit-item__extra" data-note-when="' + NOTE_WHEN + '"' + (status === NOTE_WHEN ? "" : " hidden") + ">" +
-            inputHtml(base + ".note", "Catatan", { value: getVal(data, base + ".note"), multiline: true }) +
-          "</div>" +
+          extra + noteBox +
         "</div>"
       );
     }).join("") + "</div>";
   }
 
-  function licenseSection(sec, data) {
-    return '<div class="audit-list">' + sec.items.map(function (item) {
-      var base = sec.id + "." + item.id;
+  // apps: daftar baris aplikasi yang bisa ditambah / dihapus
+  function appsSection(sec, data) {
+    var rows = data[sec.id];
+    if (!Array.isArray(rows)) rows = data[sec.id] = [];
+    var max = sec.max || DEFAULT_MAX_APPS;
+
+    var list = rows.map(function (row, i) {
+      var base = sec.id + "." + i;
       return (
-        '<div class="audit-item" data-item-path="' + base + '">' +
-          '<p class="audit-item__label">' + esc(item.label) + "</p>" +
-          statusHtml(base + ".status", getVal(data, base + ".status"), item.label) +
-          '<div class="audit-item__extra">' +
-            inputHtml(base + ".extra", item.extraLabel, { value: getVal(data, base + ".extra") }) +
-            inputHtml(base + ".note", "Catatan", { value: getVal(data, base + ".note"), multiline: true }) +
+        '<div class="app-row" data-item-path="' + base + '">' +
+          '<div class="app-row__head">' +
+            '<p class="audit-item__label">Aplikasi ' + (i + 1) + "</p>" +
+            '<button type="button" class="link-btn" data-action="remove-app" data-sec="' + esc(sec.id) + '" data-index="' + i + '">Hapus</button>' +
           "</div>" +
+          inputHtml(base + ".name", "Nama Aplikasi", { value: row.name, required: true }) +
+          statusHtml(base + ".status", row.status || "", "Aplikasi " + (i + 1)) +
+          inputHtml(base + ".version", "Versi", { value: row.version }) +
+          inputHtml(base + ".note", "Catatan", { value: row.note, multiline: true }) +
         "</div>"
       );
-    }).join("") + "</div>";
+    }).join("");
+
+    return (
+      '<div class="app-list">' + list + "</div>" +
+      (rows.length === 0 ? '<p class="app-empty">Belum ada aplikasi ditambahkan.</p>' : "") +
+      '<button type="button" class="btn btn--secondary" data-action="add-app" data-sec="' + esc(sec.id) + '"' +
+        (rows.length >= max ? " disabled" : "") + ">+ Tambah Aplikasi</button>"
+    );
   }
 
-  var sectionRenderers = { fields: fieldsSection, checklist: checklistSection, license: licenseSection };
+  var sectionRenderers = { fields: fieldsSection, checklist: itemsSection, license: itemsSection, apps: appsSection };
 
   function formSectionHtml(sec, data) {
-    return '<section class="card"><h2>' + esc(sec.title) + "</h2>" + sectionRenderers[sec.type](sec, data) + "</section>";
+    return '<section class="card"><h2>' + esc(sec.title) + "</h2>" +
+      (sec.hint ? '<p class="section-hint">' + esc(sec.hint) + "</p>" : "") +
+      sectionRenderers[sec.type](sec, data) + "</section>";
   }
 
   /* ---------- tampilan Review (hanya baca): komponen bersama dengan halaman Detail ---------- */
@@ -139,20 +173,33 @@
   /* ---------- validasi ---------- */
   function validateStep(step, stepIndex, data) {
     var missing = [];
+    function add(kind, path, label, sec, message) {
+      missing.push({ kind: kind, path: path, label: label, message: message || "", sectionTitle: sec.title, stepIndex: stepIndex });
+    }
+
     step.sections.forEach(function (sec) {
       if (sec.type === "fields") {
         sec.fields.forEach(function (f) {
           var path = sec.id + "." + f.id;
-          if (f.required && !String(getVal(data, path)).trim()) {
-            missing.push({ kind: "field", path: path, label: f.label, sectionTitle: sec.title, stepIndex: stepIndex });
+          var v = String(getVal(data, path)).trim();
+          if (!v) {
+            if (f.required) add("field", path, f.label, sec);
+          } else if (f.validate && AA.auditDefs.validators[f.validate]) {
+            var msg = AA.auditDefs.validators[f.validate](v, data[sec.id] || {});
+            if (msg) add("invalid", path, f.label, sec, msg);
           }
+        });
+      } else if (sec.type === "apps") {
+        var rows = Array.isArray(data[sec.id]) ? data[sec.id] : [];
+        rows.forEach(function (row, i) {
+          var base = sec.id + "." + i;
+          if (!String((row && row.name) || "").trim()) add("field", base + ".name", "Nama Aplikasi (baris " + (i + 1) + ")", sec);
+          if (!(row && row.status)) add("item", base, String(row && row.name || "").trim() || "Aplikasi " + (i + 1), sec);
         });
       } else {
         sec.items.forEach(function (item) {
           var path = sec.id + "." + item.id;
-          if (!getVal(data, path + ".status")) {
-            missing.push({ kind: "item", path: path, label: item.label, sectionTitle: sec.title, stepIndex: stepIndex });
-          }
+          if (!getVal(data, path + ".status")) add("item", path, item.label, sec);
         });
       }
     });
@@ -168,10 +215,17 @@
 
   function errorHtml(missing, withSection) {
     var fields = missing.filter(function (m) { return m.kind === "field"; });
+    var invalid = missing.filter(function (m) { return m.kind === "invalid"; });
     var items = missing.filter(function (m) { return m.kind === "item"; });
     var html = "";
     if (fields.length) {
       html += "<p>Data wajib belum diisi: " + esc(fields.map(function (m) { return m.label; }).join(", ")) + ".</p>";
+    }
+    if (invalid.length) {
+      html += "<p>Periksa isian berikut:</p>" +
+        '<ul class="notice__list">' + invalid.map(function (m) {
+          return "<li>" + esc(m.label) + " " + esc(m.message) + "</li>";
+        }).join("") + "</ul>";
     }
     if (items.length) {
       html += "<p>Masih ada item checklist yang belum diisi.</p>" +
@@ -188,6 +242,16 @@
     var info = data.info || (data.info = {});
     info.assetId = String(info.assetId || "").trim();
     info.auditor = String(info.auditor || "").trim();
+
+    // Rapikan spasi di semua isian teks (mis. IMEI/Serial yang tertempel dengan spasi di ujung)
+    def.steps.forEach(function (step) {
+      step.sections.forEach(function (sec) {
+        if (sec.type !== "fields" || !data[sec.id]) return;
+        sec.fields.forEach(function (f) {
+          if (typeof data[sec.id][f.id] === "string") data[sec.id][f.id] = data[sec.id][f.id].trim();
+        });
+      });
+    });
 
     // Kelompokkan section menurut "role" di definisi: specifications / checklist / license
     var parts = { specifications: {}, checklist: {}, license: {} };
@@ -248,7 +312,8 @@
       );
     }
 
-    function draw() {
+    // keepScroll: dipakai saat menambah/menghapus baris aplikasi agar halaman tidak melompat ke atas
+    function draw(keepScroll) {
       var isReview = draft.step >= def.steps.length;
       var result = AA.scoring.evaluate(def, draft.data);
       var missingAll = isReview ? validateAll(def, draft.data) : [];
@@ -287,11 +352,19 @@
 
       bind(container.querySelector(".wizard"), isReview, missingAll);
 
-      if (!firstDraw) {
+      if (!firstDraw && keepScroll !== true) {
         window.scrollTo(0, 0);
         container.focus({ preventScroll: true });
       }
       firstDraw = false;
+    }
+
+    function findSection(id) {
+      var found = null;
+      def.steps.forEach(function (step) {
+        step.sections.forEach(function (sec) { if (sec.id === id) found = sec; });
+      });
+      return found;
     }
 
     function bind(root, isReview, missingAll) {
@@ -313,6 +386,8 @@
 
         var holder = t.closest("[data-field-path],[data-item-path]");
         if (holder) holder.classList.remove("is-missing");
+        var appRow = t.closest(".app-row");
+        if (appRow) appRow.classList.remove("is-missing");
 
         // Catatan hanya muncul untuk status "Tidak OK"
         if (t.type === "radio") {
@@ -323,6 +398,26 @@
       }
       root.addEventListener("input", onInput);
       root.addEventListener("change", onInput);
+
+      // Tambah / hapus baris aplikasi (section bertipe "apps")
+      root.addEventListener("click", function (e) {
+        var btn = e.target.closest('[data-action="add-app"],[data-action="remove-app"]');
+        if (!btn || btn.disabled) return;
+        var sec = findSection(btn.getAttribute("data-sec"));
+        if (!sec) return;
+        var rows = Array.isArray(draft.data[sec.id]) ? draft.data[sec.id] : (draft.data[sec.id] = []);
+
+        if (btn.getAttribute("data-action") === "add-app") {
+          if (rows.length >= (sec.max || DEFAULT_MAX_APPS)) return;
+          rows.push({ name: "", status: "", version: "", note: "" });
+          draw(true);
+          var input = container.querySelector('[data-path="' + sec.id + "." + (rows.length - 1) + '.name"]');
+          if (input) input.focus();
+        } else {
+          rows.splice(Number(btn.getAttribute("data-index")), 1);
+          draw(true);
+        }
+      });
 
       // Kembali / Kembali Edit: data draft tetap tersimpan di AA.draft
       root.querySelector('[data-action="back"]').addEventListener("click", function () {

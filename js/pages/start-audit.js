@@ -1,5 +1,6 @@
 /* Halaman Mulai Audit: pilih jenis perangkat, lalu tekan "Mulai Audit".
-   Jika perangkat punya "auditRoute" di config.js, user diarahkan ke halaman audit-nya. */
+   Perangkat yang sudah punya audit (auditRoute, diisi oleh AA.registerDevice / config.js) bisa dipilih;
+   yang belum ditampilkan nonaktif dengan label "Segera hadir". */
 (function (AA) {
   var esc = AA.utils.escapeHtml;
 
@@ -8,12 +9,14 @@
 
     render: function (container) {
       var options = AA.config.deviceTypes.map(function (d) {
+        var ready = !!d.auditRoute;
         return (
-          '<label class="device-option">' +
-            '<input type="radio" name="device-type" value="' + esc(d.id) + '">' +
+          '<label class="device-option' + (ready ? "" : " is-disabled") + '">' +
+            '<input type="radio" name="device-type" value="' + esc(d.id) + '"' + (ready ? "" : " disabled") + ">" +
             '<span class="device-option__body">' +
               AA.components.icon(d.icon) +
               "<span>" + esc(d.label) + "</span>" +
+              (ready ? "" : '<span class="device-soon">Segera hadir</span>') +
             "</span>" +
           "</label>"
         );
@@ -54,7 +57,7 @@
           return;
         }
 
-        notice.textContent = "Audit " + selected.label + " belum tersedia. Saat ini baru Audit Laptop yang bisa dilakukan.";
+        notice.textContent = "Audit " + selected.label + " belum tersedia.";
         notice.hidden = false;
       });
     }
