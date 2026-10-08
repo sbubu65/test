@@ -1,14 +1,23 @@
 /* Definisi Audit Laptop.
-   Form dibuat otomatis dari data ini oleh components/audit-wizard.js.
+   Form, Review, Hasil, pengiriman ke Spreadsheet, dan Riwayat dibuat otomatis dari data ini.
+
    Tipe section:
-     "fields"    -> kolom isian teks            (fields: [{ id, label, type?, placeholder?, required? }])
-     "checklist" -> OK / Tidak OK / N/A, catatan muncul jika Tidak OK   (items: [{ id, label }])
-     "license"   -> status + satu isian tambahan + catatan              (items: [{ id, label, extraLabel }])
+     "fields"    -> kolom isian teks. field: { id, label, type?, placeholder?, required?, inputMode?, validate?, sheet? }
+     "checklist" -> OK / Tidak OK / N/A. item: { id, label, key?, extraLabel?, extraSheet?, sheet? }
+                    catatan muncul jika Tidak OK (noteMode "onFail"); "always" = catatan selalu tampil
+     "license"   -> seperti checklist tetapi catatan selalu tampil (noteMode "always")
+     "apps"      -> daftar baris aplikasi yang bisa ditambah/dihapus (nama, status, versi, catatan)
    Properti section lain:
-     scored: true      -> ikut dihitung dalam Nilai Audit (checklist/license)
-     role              -> kolom di record tersimpan: "specifications" | "checklist" | "license"
-     reviewGroup       -> judul kartu di halaman Review (section dengan judul sama digabung)
-   Untuk perangkat lain (V0.x berikutnya): salin file ini dan ubah isinya. */
+     scored: true      -> ikut dihitung dalam Nilai Audit
+     role              -> pengelompokan di record: "specifications" | "checklist" | "license" | "apps"
+     reviewGroup       -> judul kartu di Review/Detail (section dengan judul sama digabung)
+     hint              -> teks bantuan di bawah judul section
+   Pemetaan ke Spreadsheet:
+     field.sheet       -> nama kolom Spreadsheet untuk isian itu
+     item.sheet        -> { status, extra, note }: kolom khusus per item (dipakai lisensi laptop)
+     item.key          -> kunci di checklistResult (JSON); default = label. Harus unik dalam satu perangkat.
+     item.extraSheet   -> kolom khusus untuk isian tambahan item (mis. batteryHealth); default masuk checklistValues
+   Id item harus unik di seluruh definisi satu perangkat (dicek oleh tests/defs.test.js). */
 (function (AA) {
   AA.auditDefs.laptop = {
     id: "laptop",
@@ -26,9 +35,9 @@
             type: "fields",
             role: "specifications", reviewGroup: "Spesifikasi",
             fields: [
-              { id: "brand",  label: "Brand" },
-              { id: "model",  label: "Model" },
-              { id: "serial", label: "Serial Number" }
+              { id: "brand",  label: "Brand",         sheet: "brand" },
+              { id: "model",  label: "Model",         sheet: "model" },
+              { id: "serial", label: "Serial Number", sheet: "serialNumber" }
             ]
           }
         ]
@@ -43,11 +52,11 @@
             type: "fields",
             role: "specifications", reviewGroup: "Spesifikasi",
             fields: [
-              { id: "processor", label: "Processor" },
-              { id: "ram",       label: "RAM" },
-              { id: "storage",   label: "Storage" },
-              { id: "os",        label: "Operating System" },
-              { id: "gpu",       label: "GPU" }
+              { id: "processor", label: "Processor",        sheet: "processor" },
+              { id: "ram",       label: "RAM",              sheet: "ram" },
+              { id: "storage",   label: "Storage",          sheet: "storage" },
+              { id: "os",        label: "Operating System", sheet: "operatingSystem" },
+              { id: "gpu",       label: "GPU",              sheet: "gpu" }
             ]
           }
         ]
@@ -91,9 +100,9 @@
             role: "license", reviewGroup: "Lisensi",
             scored: true,
             items: [
-              { id: "windows",   label: "Windows",          extraLabel: "Versi Windows" },
-              { id: "office",    label: "Microsoft Office", extraLabel: "Versi" },
-              { id: "antivirus", label: "Antivirus",        extraLabel: "Nama Antivirus" }
+              { id: "windows",   label: "Windows",          extraLabel: "Versi Windows",  sheet: { status: "windowsStatus",   extra: "windowsVersion", note: "windowsNote" } },
+              { id: "office",    label: "Microsoft Office", extraLabel: "Versi",          sheet: { status: "officeStatus",    extra: "officeVersion",  note: "officeNote" } },
+              { id: "antivirus", label: "Antivirus",        extraLabel: "Nama Antivirus", sheet: { status: "antivirusStatus", extra: "antivirusName",  note: "antivirusNote" } }
             ]
           }
         ]
