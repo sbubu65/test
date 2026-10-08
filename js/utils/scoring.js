@@ -7,7 +7,7 @@
      80–100 -> Baik | 60–79 -> Cukup | 40–59 -> Rusak Ringan | 0–39 -> Rusak Berat
    Jika OK + Tidak OK = 0 (semua N/A / belum diisi) -> "Belum dapat dinilai", bukan 100%.
 
-   Section yang dinilai = section di definisi audit dengan  scored: true  (tipe checklist / license). */
+   Section yang dinilai = section di definisi audit dengan  scored: true  (tipe checklist / license / apps). */
 (function (AA) {
   var CATEGORIES = [
     { min: 80, label: "Baik",         tone: "baik" },
@@ -85,6 +85,17 @@
     def.steps.forEach(function (step) {
       step.sections.forEach(function (sec) {
         if (!sec.scored) return;
+
+        // Section "apps": tiap baris aplikasi yang ditambahkan auditor = satu item bersatus
+        if (sec.type === "apps") {
+          var rows = data && Array.isArray(data[sec.id]) ? data[sec.id] : [];
+          rows.forEach(function (row, i) {
+            var name = String((row && row.name) || "").trim();
+            fn(sec, { id: String(i), label: name || "Aplikasi " + (i + 1) }, row || {});
+          });
+          return;
+        }
+
         sec.items.forEach(function (item) {
           var entry = data && data[sec.id] && data[sec.id][item.id];
           fn(sec, item, entry || {});
